@@ -1,0 +1,316 @@
+#lang racket/base
+
+(require racket/match racket/contract)
+
+; Digit
+(struct One (a))
+(struct Two (a b))
+(struct Three (a b c))
+(struct Four (a b c d))
+(define Digit?/c (or/c One? Two? Three? Four?))
+
+; Node
+(struct Node2 (v a b))
+(struct Node3 (v a b c))
+
+; Finger Tree
+(struct Empty ())
+(struct Single (a))
+(struct Deep (v left inner right))
+
+(struct FingerTree (empty-value measure assoc))
+(struct FingerTreeWrap (core ft))
+
+(define (measure:node f n depth)
+  (match depth
+    [0 (match-define (FingerTree _ m _) f) (m n)]
+    [_ (match n
+        [(Node2 v _ _) v]
+        [(Node3 v _ _ _) v]
+      )]
+  )
+)
+
+(define (measure:ft f ft depth)
+  (match ft
+    [(Deep v _ _ _) v]
+    [(Single a) (measure:node f a depth)]
+    [(Empty) (match-define (FingerTree e _ _) f) (e)]
+  )
+)
+
+(define (measure:digit f d depth)
+  (match-define (FingerTree _ _ as) f)
+  (match d
+    [(One a)
+      (measure:node f a depth)]
+    [(Two a b)
+      (as (measure:node f a depth) (measure:node f b depth))]
+    [(Three a b c)
+      (as (as (measure:node f a depth) (measure:node f b depth)) (measure:node f c depth))]
+    [(Four a b c d)
+      (as (as (measure:node f a depth) (measure:node f b depth)) 
+        (as (measure:node f c depth) (measure:node f d depth)))]
+  )
+)
+
+(define (consL-impl core ft v [depth 0])
+  (match ft
+    [(Empty) (Single v)]
+    [(Single a)
+      (match-define (FingerTree _ m as) core)
+      (define v^ (as (measure:node core v depth) (measure:node core a depth)))
+      (Deep v^ (One v) (Empty) (One a))
+    ]
+    [(Deep v^ left inner right)
+      (match-define (FingerTree _ m as) core)
+      (define v^^ (as (measure:node core v depth) v^))
+      (match left
+        [(Four a b c d)
+          (define left^ (Two v a))
+          (define n (Node3 (as 
+            (as (measure:node core b depth) (measure:node core c depth))
+            (measure:node core d depth))
+            b c d))
+          (define inner^ (consL-impl core inner n (+ depth 1)))
+          (Deep v^^ left^ inner^ right)
+        ]
+        [_ 
+          (define left^ (match left
+            [(One a) (Two v a)]
+            [(Two a b) (Three v a b)]
+            [(Three a b c) (Four v a b c)]
+          ))
+          (Deep v^^ left^ inner right)
+        ]
+      )
+    ]
+  )
+)
+
+(define (consL ft v)
+  (match-define (FingerTreeWrap core ft^) ft)
+  (FingerTreeWrap core (consL-impl core ft^ v))
+)
+
+(define (consR-impl core ft v [depth 0])
+  (match ft
+    [(Empty) (Single v)]
+    [(Single a)
+      (match-define (FingerTree _ _ as) core)
+      (define v^ (as (measure:node core v depth) (measure:node core a depth)))
+      (Deep v^ (One v) (Empty) (One a))
+    ]
+    [(Deep v^ left inner right)
+      (match-define (FingerTree _ _ as) core)
+      (define v^^ (as v^ (measure:node core v depth)))
+      (match right
+        [(Four a b c d)
+          (define right^ (Two d v))
+          (define n (Node3 (as 
+            (as (measure:node core a depth) (measure:node core b depth))
+            (measure:node core c depth))
+            a b c))
+          (define inner^ (consR-impl core inner n (+ depth 1)))
+          (Deep v^^ left inner^ right^)
+        ]
+        [_ 
+          (define right^ (match right
+            [(One a) (Two a v)]
+            [(Two a b) (Three a b v)]
+            [(Three a b c) (Four a b c v)]
+          ))
+          (Deep v^^ left inner right^)
+        ]
+      )
+    ]
+  )
+)
+
+(define (consR ft v)
+  (match-define (FingerTreeWrap core ft^) ft)
+  (FingerTreeWrap core (consR-impl core ft^ v))
+)
+
+(define (hdL ft)
+  (match-define (FingerTreeWrap core f) ft)
+  (define-values (h f^) (hdL:impl core f))
+  (values h (FingerTreeWrap core f^))
+)
+
+(define (hdL:impl core ft [depth 0])
+  (match ft
+    [(Empty)
+      (values #f ft)
+    ]
+    [(Single a)
+      (values a (Empty))
+    ]
+    [(Deep _ (One a) (Empty) (One b))
+      (values a (Single b))
+    ]
+    [(Deep _ (One a) (Empty) right)
+      (match-define (FingerTree _ _ as) core)
+      (match right
+        [(Two b c)
+          (values a (Deep (as (measure:node core b depth) (measure:node core c depth))
+            (One b) (Empty) (One c)))
+        ]
+        [(Three b c d)
+          (values a (Deep 
+            (as (as (measure:node core b depth) (measure:node core c depth)) (measure:node core d depth))
+            (One b) (Empty) (Two c d)))
+        ]
+        [(Four b c d e)
+          (values a (Deep 
+            (as 
+              (as (measure:node core b depth) (measure:node core c depth))
+              (as (measure:node core d depth) (measure:node core e depth)))
+            (Two b c) (Empty) (Two d e)))
+        ]
+      )
+    ]
+    [(Deep _ (One a) inner right)
+      (define-values (lhs inner^) (hdL:impl core inner (+ depth 1)))
+      (match-define (FingerTree _ _ as) core)
+      (define-values (left-v left-digit) (match lhs
+        [(Node2 v b c) (values v (Two b c))]
+        [(Node3 v b c d) (values v (Three b c d))]
+        ))
+      (values a (Deep (as left-v (as (measure:ft core inner (add1 depth)) (measure:digit core right depth)))
+        left-digit
+        inner^
+        right
+      ))
+    ]
+    [(Deep _ left inner right)
+      (define-values (h lhs^) (match left
+        [(Two a b) (values a (One b))]
+        [(Three a b c) (values a (Two b c))]
+        [(Four a b c d) (values a (Three b c d))]
+      ))
+      (match-define (FingerTree _ _ as) core)
+      (values h (Deep 
+        (as (measure:digit core lhs^ depth) (as (measure:ft core inner (+ depth 1))
+          (measure:digit core right depth)))
+        lhs^
+        inner
+        right
+      ))
+    ]
+  )
+)
+
+(define (debug:getMaxDepth ft)
+  (match-define (FingerTreeWrap core ft^) ft)
+  (debug:getMaxDepth:impl core ft^)
+)
+
+(define (debug:getMaxDepth:impl core ft [depth 0])
+  (match ft
+    [(Deep _ _ inner _)
+      (debug:getMaxDepth:impl core inner (+ depth 1))
+    ]
+    [(or (Empty) (Single _)) depth]
+  )
+)
+
+(define (make-empty-finger-tree empty-value measure assoc)
+  (FingerTreeWrap (FingerTree empty-value measure assoc) (Empty))
+)
+
+(define size-core (FingerTree (lambda () 0) (lambda (_) 1) +))
+(define only-left (FingerTree (lambda () #f) (lambda (x) x) (lambda (l r) (if l l r))))
+
+(define (finger-tree:measure-value ft)
+  (match-define (FingerTreeWrap core f) ft)
+  (measure:ft core f 0)
+)
+
+(define (hdR:impl core ft [depth 0])
+  (match ft
+    [(Empty)
+      (values #f ft)
+    ]
+    [(Single a)
+      (values a (Empty))
+    ]
+    [(Deep _ (One a) (Empty) (One b))
+      (values b (Single a))
+    ]
+    [(Deep _ left (Empty) (One a))
+      (match-define (FingerTree _ _ as) core)
+      (match left
+        [(Two b c)
+          (values a (Deep (as (measure:node core b depth) (measure:node core c depth))
+            (One b) (Empty) (One c)))
+        ]
+        [(Three b c d)
+          (values a (Deep 
+            (as (as (measure:node core b depth) (measure:node core c depth)) (measure:node core d depth))
+            (One b) (Empty) (Two c d)))
+        ]
+        [(Four b c d e)
+          (values a (Deep 
+            (as 
+              (as (measure:node core b depth) (measure:node core c depth))
+              (as (measure:node core d depth) (measure:node core e depth)))
+            (Two b c) (Empty) (Two d e)))
+        ]
+      )
+    ]
+    [(Deep _ left inner (One a))
+      (define-values (rhs inner^) (hdR:impl core inner (add1 depth)))
+      (match-define (FingerTree _ _ as) core)
+      (define-values (right-v right-digit) (match rhs
+        [(Node2 v b c) (values v (Two b c))]
+        [(Node3 v b c d) (values v (Three b c d))]
+        ))
+      (values a (Deep (as (measure:digit core left depth) (as (measure:ft core inner (add1 depth)) right-v))
+        left
+        inner^
+        right-digit
+      ))
+    ]
+    [(Deep _ lhs inner right)
+      (define-values (h rhs^) (match right
+        [(Two a b) (values b (One a))]
+        [(Three a b c) (values c (Two a b))]
+        [(Four a b c d) (values d (Three a b c))]
+      ))
+      (match-define (FingerTree _ _ as) core)
+      (values h (Deep 
+        (as (as (measure:digit core lhs depth) (measure:ft core inner (+ depth 1)))
+          (measure:digit core rhs^ depth))
+        lhs
+        inner
+        rhs^
+      ))
+    ]
+  )
+)
+
+(define (hdR ft)
+  (match-define (FingerTreeWrap core f) ft)
+  (define-values (h f^) (hdR:impl core f))
+  (values h (FingerTreeWrap core f^))
+)
+
+(define x (FingerTreeWrap size-core (Empty)))
+(for ([y (in-range 100)])
+  (set! x (consL x y))
+)
+(printf "0 .. 99 count: ~a\n" (finger-tree:measure-value x))
+(printf "0 .. 99 depth: ~a\n" (debug:getMaxDepth x))
+(set! x (FingerTreeWrap only-left (Empty)))
+(for ([y (in-range 100)])
+  (set! x (consL x y))
+)
+(printf "0 .. 99 left: ~a\n" (finger-tree:measure-value x))
+(printf "0 .. 99 depth: ~a\n" (debug:getMaxDepth x))
+
+(for ([v (in-range 100)])
+  (define-values (v^ x^) (hdR x))
+  (set! x x^)
+  (printf "v: ~a, v^: ~a\n" v v^)
+)
