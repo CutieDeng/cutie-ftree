@@ -295,6 +295,68 @@
   (define-values (h f^) (hdR:impl core f))
   (values h (FingerTreeWrap core f^))
 )
+(define (digit-add-list digit rest)
+  (match digit
+    [(One a) (cons a rest)]
+    [(Two a b) (append (list a b) rest)]
+    [(Three a b c) (append (list a b c) rest)]
+    [(Four a b c d) (append (list a b c d) rest)]
+  )
+)
+
+; 2 .. 8
+(define (list->node:impl core rest depth)
+  (match-define (FingerTree _ _ as) core)
+  (printf "rest: ~a\n" rest)
+  (match rest
+    [`(,a ,b ,c ,d) (list 
+      (Node2 (as (measure:node core a depth) (measure:node core b depth)) a b) 
+      (Node2 (as (measure:node core c depth) (measure:node core d depth)) c d))]
+    [`(,a ,b ,c) (list (Node3 
+      (as (measure:node core a depth) (as (measure:node core b depth) (measure:node core c depth)))
+      a b c))]
+    [`(,a ,b) (list (Node2 
+      (as (measure:node core a depth) (measure:node core b depth))
+      a b))]
+    [`(,a ,b ,c ,r ...) 
+      (cons 
+        (Node3 (as (measure:node core a depth) (as (measure:node core b depth) (measure:node core c depth))) a b c) 
+        (list->node:impl core r depth))]
+  )
+)
+
+(define (concat:impl core lhs rhs [depth 0])
+  (match* (lhs rhs)
+    [(_ (Empty)) lhs]
+    [((Empty) _) rhs]
+    [((Single a) _) (consL-impl core rhs a depth)]
+    [(_ (Single a)) (consR-impl core lhs a depth)]
+    [((Deep lhs-v lhs-left lhs-inner lhs-right) (Deep rhs-v rhs-left rhs-inner rhs-right))
+      (define mid (digit-add-list lhs-right (digit-add-list rhs-left '())))
+      (define mid^ (list->node:impl core mid depth))
+      (define left-inner^ (for/fold ([i lhs-inner]) ([m mid^])
+        (consR-impl core i m depth)
+      ))
+      (define inner^ (concat:impl core left-inner^ rhs-inner (add1 depth)))
+      (match-define (FingerTree _ _ as) core)
+      (define v^ (as lhs-v rhs-v))
+      (printf "lhs: ~a, rhs: ~a, total: ~a\n" lhs-v rhs-v v^)
+      (Deep v^ lhs-left inner^ rhs-right)
+    ]
+  )
+)
+
+(define (concat lhs rhs)
+  (unless (eq? (FingerTreeWrap-core lhs) (FingerTreeWrap-core rhs)) (error 'concat "Mismatch concat of different finger tree"))
+  (match-define (FingerTreeWrap core f) lhs)
+  (match-define (FingerTreeWrap _ f2) rhs)
+  (FingerTreeWrap core (concat:impl core f f2))
+)
+
+
+
+
+
 
 (define x (FingerTreeWrap size-core (Empty)))
 (for ([y (in-range 100)])
@@ -308,9 +370,15 @@
 )
 (printf "0 .. 99 left: ~a\n" (finger-tree:measure-value x))
 (printf "0 .. 99 depth: ~a\n" (debug:getMaxDepth x))
+(define y x)
 
 (for ([v (in-range 100)])
   (define-values (v^ x^) (hdR x))
   (set! x x^)
   (printf "v: ~a, v^: ~a\n" v v^)
 )
+
+(define y2 (concat y y))
+(finger-tree:measure-value y2)
+(define y3 (consL y2 -1))
+(finger-tree:measure-value y3)
