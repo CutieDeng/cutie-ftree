@@ -369,4 +369,22 @@
   (Deep v lhs inner rhs)
 )
 
-(provide build-ft0)
+(define (hdL-view ft)
+  (match ft
+    [(Single a) a]
+    [(Deep _ a _ _) (match a
+      [(or (One x) (Two x _) (Three x _ _) (Four x _ _ _)) x]
+    )]
+  )
+)
+
+(define (hdR-view ft)
+  (match ft
+    [(Single a) a]
+    [(Deep _ _ _ a) (match a
+      [(or (One x) (Two _ x) (Three _ _ x) (Four _ _ _ x)) x]
+    )]
+  )
+)
+
+(provide build-ft0 hdL-view hdR-view)
