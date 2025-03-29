@@ -280,7 +280,7 @@
 )
 
 (define (ral-split:impl ral idx depth)
-  (printf "debug, ral-split:impl ~a\n" ral)
+  ; (printf "debug, ral-split:impl ~a\n" ral)
   (match ral
     [(Empty) (assert-unreachable)]
     [(Single v)
@@ -304,10 +304,10 @@
         [(< idx inner-measure) 
           ; lhs (l m r) rhs
           (define-values (l m r) (ral-split:impl inner (- idx lhs-measure) (add1 depth))) 
-          (printf "debug, l: ~a, m: ~a, r: ~a\n" l m r)
+          ; (printf "debug, l: ~a, m: ~a, r: ~a\n" l m r)
           (define left (left-digit+ft->ft lhs l depth))
           (define right (right-digit+ft->ft rhs r depth))
-          (printf "debug, left: ~a; right: ~a\n" left right)
+          ; (printf "debug, left: ~a; right: ~a\n" left right)
           (define-values (idx^ l^ m^ r^) (ral-split-node:impl m (- idx lhs-measure) (add1 depth)))
           (define left^ (for/fold ([init left]) ([i l^]) (consR:impl core/size init i)))
           (define right^ (for/foldr ([init right]) ([i r^]) (consL:impl core/size init i)))
@@ -329,7 +329,7 @@
 
 (define (test0)
   (define x (ral-empty))
-  (define n 10)
+  (define n 20)
   (set! x (for/fold ([x x]) ([i (in-range n)])
     ; (ral-consr x i)
     (ral-consl x i)
@@ -346,8 +346,9 @@
   )
   (define-values (l m r) (ral-split x 5))
   (printf "l: ~a\nm: ~a\nr: ~a\n" l m r)
-  (for ([i (in-range (ral-length r))])
-    (printf "~a: ~a\n" i (ral-ref r i))
+  (for ([i (in-range (ral-length r))] [j (in-ral0 r)])
+    (printf "~a: ~a\n" i j)
+    ; (printf "~a: ~a\n" i (ral-ref r i))
   )
   (printf "\n")
 )
@@ -356,3 +357,97 @@
 (provide ral-empty ral-consl ral-consr ral-dropl ral-dropr ral-split ral-append)
 (provide ral-ref ral-set ral-length)
 (provide in-ral0)
+
+(define (vector->node3vector vec start len depth)
+  (define new-length (quotient len 3))
+  (define new-vec (make-vector new-length))
+  (for ([i (in-range new-length)])
+    (define x0 (vector-ref vec (+ start (* 3 i))))
+    (define x1 (vector-ref vec (+ start 1 (* 3 i))))
+    (define x2 (vector-ref vec (+ start 2 (* 3 i))))
+    (vector-set! new-vec i (Node3 (+
+        (measure:node core/size x0 depth)
+        (measure:node core/size x1 depth)
+        (measure:node core/size x2 depth)
+      ) 
+      x0 x1 x2
+    ))
+  )
+  new-vec
+)
+
+(define (vector->ral:impl vec sz depth)
+  (define vec-len (vector-length vec))
+  (cond
+    [(<= vec-len 8) (small-vector->ral:impl vec depth)]
+    [else
+      (match (modulo vec-len 3)
+        [0
+          (define lhs (Three (vector-ref vec 0) (vector-ref vec 1) (vector-ref vec 2)))
+          (define rhs (Three (vector-ref vec (- vec-len 3)) (vector-ref vec (- vec-len 2)) (vector-ref vec (- vec-len 1))))
+          ; very creative impl
+          (define sub-sz (* 6 (measure:node core/size (vector-ref vec 0) depth)))
+          (define mid (vector->node3vector vec 3 (- vec-len 6) depth))
+          (Deep sz lhs (vector->ral:impl mid (- sz sub-sz) (add1 depth)) rhs)
+        ]
+        [1
+          (define lhs (Four (vector-ref vec 0) (vector-ref vec 1) (vector-ref vec 2) (vector-ref vec 3)))
+          (define rhs (Three (vector-ref vec (- vec-len 3)) (vector-ref vec (- vec-len 2)) (vector-ref vec (- vec-len 1))))
+          ; very creative impl
+          (define sub-sz (* 7 (measure:node core/size (vector-ref vec 0) depth)))
+          (define mid (vector->node3vector vec 4 (- vec-len 7) depth))
+          (Deep sz lhs (vector->ral:impl mid (- sz sub-sz) (add1 depth)) rhs)
+        ]
+        [2
+          (define lhs (Four (vector-ref vec 0) (vector-ref vec 1) (vector-ref vec 2) (vector-ref vec 3)))
+          (define rhs (Four (vector-ref vec (- vec-len 4)) (vector-ref vec (- vec-len 3)) (vector-ref vec (- vec-len 2)) (vector-ref vec (- vec-len 1))))
+          ; very creative impl
+          (define sub-sz (* 8 (measure:node core/size (vector-ref vec 0) depth)))
+          (define mid (vector->node3vector vec 4 (- vec-len 8) depth))
+          (Deep sz lhs (vector->ral:impl mid (- sz sub-sz) (add1 depth)) rhs)
+        ]
+      )
+    ]
+  )
+)
+
+(define (small-vector->ral:impl vec depth)
+  (define v (for/fold ([v 0]) ([k (in-vector vec)]) (+ v (measure:node core/size k depth))))
+  (match vec
+    [(vector x0) (Single x0)]
+    [(vector x0 x1) (Deep v (One x0) (ral-empty) (One x1))]
+    [(vector x0 x1 x2) (Deep v (One x0) (ral-empty) (Two x1 x2))]
+    [(vector x0 x1 x2 x3) (Deep v (Two x0 x1) (ral-empty) (Two x2 x3))]
+    [(vector x0 x1 x2 x3 x4) (Deep v (Two x0 x1) (ral-empty) (Three x2 x3 x4))]
+    [(vector x0 x1 x2 x3 x4 x5) (Deep v (Three x0 x1 x2) (ral-empty) (Three x3 x4 x5))]
+    [(vector x0 x1 x2 x3 x4 x5 x6) (Deep v (Three x0 x1 x2) (ral-empty) (Four x3 x4 x5 x6))]
+    [(vector x0 x1 x2 x3 x4 x5 x6 x7) (Deep v (Four x0 x1 x2 x3) (ral-empty) (Four x4 x5 x6 x7))]
+  )
+)
+
+(define (vector->ral vec)
+  ; ...
+  ; (for/fold ([i (ral-empty)]) ([v (in-vector vec)]) (ral-consr i v))
+  ; maybe opt
+  (vector->ral:impl vec (vector-length vec) 0)
+)
+
+(define (ral->vector ral)
+  (define vec (make-vector (ral-length ral)))
+  (for ([i (in-range (ral-length ral))]) 
+    (vector-set! vec i (ral-ref ral i))
+  )
+  vec
+)
+
+(provide vector->ral ral->vector)
+
+(define (test1)
+  (define x #[10 20 30 40 50 60 70 80 90])
+  (define y (vector->ral x))
+  (for ([j (in-ral0 y)]) (printf "~a;" j))
+  (printf "\n")
+  (define x2 (ral->vector y))
+  (printf "x2: ~a\n" x2)
+  (printf "eq? ~a" (equal? x x2))
+)
