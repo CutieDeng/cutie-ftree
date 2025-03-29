@@ -21,6 +21,9 @@
   (hdR:impl core/size ral)
 )
 
+(define ral-viewl hdL-view)
+(define ral-viewR hdR-view)
+
 (define (ral-append ral0 ral1)
   (concat:impl core/size ral0 ral1)
 )
@@ -233,13 +236,18 @@
   )
 )
 
+; depth is the level of the node
+(define (node->digit node depth)
+  (list->digit (node->list node) (sub1 depth))
+)
+
 (define (left-digit+ft->ft digit ft depth)
   (match ft
     [(Empty)
       (define digit^ (digit-add-list digit '()))
       (digit-list->ft digit^ depth)]
     [_ (define-values (r ft^) (hdR:impl core/size ft (add1 depth)))
-      (build-ft0 core/size digit ft^ (One r) depth)]
+      (build-ft0 core/size digit ft^ (node->digit r (add1 depth)) depth)]
   )
 )
 (define (right-digit+ft->ft digit ft depth)
@@ -248,7 +256,7 @@
       (define digit^ (digit-add-list digit '()))
       (digit-list->ft digit^ depth)]
     [_ (define-values (l ft^) (hdL:impl core/size ft (add1 depth)))
-      (build-ft0 core/size (One l) ft^ digit depth)]
+      (build-ft0 core/size (node->digit l (add1 depth)) ft^ digit depth)]
   )
 )
 
@@ -272,6 +280,7 @@
 )
 
 (define (ral-split:impl ral idx depth)
+  (printf "debug, ral-split:impl ~a\n" ral)
   (match ral
     [(Empty) (assert-unreachable)]
     [(Single v)
@@ -295,14 +304,17 @@
         [(< idx inner-measure) 
           ; lhs (l m r) rhs
           (define-values (l m r) (ral-split:impl inner (- idx lhs-measure) (add1 depth))) 
+          (printf "debug, l: ~a, m: ~a, r: ~a\n" l m r)
           (define left (left-digit+ft->ft lhs l depth))
           (define right (right-digit+ft->ft rhs r depth))
+          (printf "debug, left: ~a; right: ~a\n" left right)
           (define-values (idx^ l^ m^ r^) (ral-split-node:impl m (- idx lhs-measure) (add1 depth)))
           (define left^ (for/fold ([init left]) ([i l^]) (consR:impl core/size init i)))
           (define right^ (for/foldr ([init right]) ([i r^]) (consL:impl core/size init i)))
           (values idx^ left^ m^ right^)
           ]
         [(< idx v) (define-values (idx^ l m r) (ral-split-digit:impl rhs (- idx inner-measure) depth))
+          ; lhs inner (l m r)
           (define right (digit-list->ft r depth))
           (match inner
             [(Empty) (values (digit-list2->ft (append (digit-add-list lhs '()) l) depth) m right)]
@@ -334,5 +346,13 @@
   )
   (define-values (l m r) (ral-split x 5))
   (printf "l: ~a\nm: ~a\nr: ~a\n" l m r)
+  (for ([i (in-range (ral-length r))])
+    (printf "~a: ~a\n" i (ral-ref r i))
+  )
+  (printf "\n")
 )
 ; (test0)
+
+(provide ral-empty ral-consl ral-consr ral-dropl ral-dropr ral-split ral-append)
+(provide ral-ref ral-set ral-length)
+(provide in-ral0)
