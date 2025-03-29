@@ -312,7 +312,7 @@
 )
 
 ; 2 .. 8
-(define (list->node:impl core rest depth)
+(define (list->nodes:impl core rest depth)
   (match-define (FingerTree _ _ as) core)
   (printf "rest: ~a\n" rest)
   (match rest
@@ -328,7 +328,7 @@
     [`(,a ,b ,c ,r ...) 
       (cons 
         (Node3 (as (measure:node core a depth) (as (measure:node core b depth) (measure:node core c depth))) a b c) 
-        (list->node:impl core r depth))]
+        (list->nodes:impl core r depth))]
   )
 )
 
@@ -340,7 +340,7 @@
     [(_ (Single a)) (consR:impl core lhs a depth)]
     [((Deep lhs-v lhs-left lhs-inner lhs-right) (Deep rhs-v rhs-left rhs-inner rhs-right))
       (define mid (digit-add-list lhs-right (digit-add-list rhs-left '())))
-      (define mid^ (list->node:impl core mid depth))
+      (define mid^ (list->nodes:impl core mid depth))
       (define left-inner^ (for/fold ([i lhs-inner]) ([m mid^])
         (consR:impl core i m depth)
       ))
@@ -359,3 +359,14 @@
   (match-define (FingerTreeWrap _ f2) rhs)
   (FingerTreeWrap core (concat:impl core f f2))
 )
+
+(define (build-ft0 core lhs inner rhs depth)
+  (match-define (FingerTree _ m as) core)
+  (define lhs-measure (measure:digit core lhs depth))
+  (define mid (measure:ft core inner (add1 depth)))
+  (define rhs-measure (measure:digit core rhs depth))
+  (define v (as lhs-measure (as mid rhs-measure)))
+  (Deep v lhs inner rhs)
+)
+
+(provide build-ft0)
