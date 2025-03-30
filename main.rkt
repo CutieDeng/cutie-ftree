@@ -451,3 +451,68 @@
   (printf "x2: ~a\n" x2)
   (printf "eq? ~a" (equal? x x2))
 )
+
+(define (ral-copy ral start end)
+  (define len (- end start))
+  (cond
+    [(= len 0) (ral-empty)]
+    [(and (= start 0) (= end (ral-length ral))) ral]
+    [(= start 0) (match-define-values (l _ _) (ral-split ral end)) l]
+    [(= end (ral-length ral)) (match-define-values (_ _ r) (ral-split ral (sub1 start))) r]
+    [else (match-define-values (l _ _) (ral-split ral end))
+      (match-define-values (_ _ r) (ral-split l (sub1 start)))
+      r
+    ]
+  )
+)
+
+(define (ral-empty? ral)
+  (match ral
+    [(Empty) #t]
+    [_ #f]
+  )
+)
+
+(define (ral-take ral pos)
+  (cond
+    [(= pos (ral-length ral)) ral]
+    [else (match-define-values (l _ _) (ral-split ral pos)) l]
+  )
+)
+
+(define (ral-take-right ral pos)
+  (ral-drop ral (- (ral-length ral) pos))
+)
+
+(define (ral-drop ral pos) 
+  (cond
+    [(= pos 0) ral]
+    [else (match-define-values (_ _ r) (ral-split ral (sub1 pos))) r]
+  )
+)
+
+(define (ral-drop-right ral pos)
+  (ral-take ral (- (ral-length ral) pos))
+)
+
+(define (ral-split-at ral pos)
+  (cond
+    [(= pos (ral-length ral)) (values ral (ral-empty))]
+    [else
+      (match-define-values (l m r) (ral-split ral pos))
+      (values l (ral-consl r m))
+    ]
+  )
+)
+
+(define (ral-split-at-right ral pos)
+  (match-define-values (l r) (ral-split-at ral (- (ral-length ral) pos)))
+  (values r l)
+)
+
+(provide ral-empty? ral-take ral-take-right ral-drop ral-drop-right ral-split-at ral-split-at-right)
+(provide ral-copy)
+
+(define (ral-fold:impl ral )
+  (error 'unimpl)
+)
