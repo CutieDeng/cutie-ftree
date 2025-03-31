@@ -24,6 +24,8 @@
 (define ral-viewl hdL-view)
 (define ral-viewR hdR-view)
 
+(provide ral-viewl ral-viewR)
+
 (define (ral-append ral0 ral1)
   (concat:impl core/size ral0 ral1)
 )
