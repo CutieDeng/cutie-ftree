@@ -518,3 +518,6 @@
 (define (ral-fold:impl ral )
   (error 'unimpl)
 )
+
+(define ral? finger-tree?)
+(provide ral?)

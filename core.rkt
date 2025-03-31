@@ -18,6 +18,8 @@
 (struct Empty () #:transparent)
 (struct Single (a) #:transparent)
 (struct Deep (v left inner right) #:transparent)
+(define finger-tree? (or/c Empty? Single? Deep?))
+(provide finger-tree?)
 
 (struct FingerTree (empty-value measure assoc))
 (struct FingerTreeWrap (core ft))
