@@ -1070,3 +1070,12 @@
   (set! int-ordl3 (ordl-insert int-ordl3 0 "float" #f))
   (check-eq? int-ordl3-back int-ordl3 "Insert [(0, int)] (0 float) = ignored")
 )
+
+(module+ test
+  (define int-ordl4 (make-empty-ordl integer-compare))
+  (set! int-ordl4 (ordl-insert int-ordl4 0 "int" #t))
+  (define int-ordl4-back int-ordl4)
+  (set! int-ordl4 (ordl-insert int-ordl4 0 "float" #t))
+  (check-not-eq? int-ordl4-back int-ordl4 "Insert! [(0, int)] (0 double) = [(0, double)]")
+)
+
