@@ -1086,3 +1086,12 @@
   (check-equal? (ordl-query int-ordl5 0) (cons 0 "int"))
   (check-equal? (ordl-query int-ordl5 1) (cons 1 "float"))
 )
+
+(module+ test
+  (define int-ordl6 (make-empty-ordl integer-compare))
+  (set! int-ordl6 (for/fold ([io int-ordl6]) ([i (in-range 10)])
+    (ordl-insert io i (add1 i) #f)
+  ))
+  (check-equal? (ordl-query int-ordl6 7) (cons 7 8))
+  (check-equal? (ordl-query int-ordl6 10) #f)
+)
