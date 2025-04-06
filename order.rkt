@@ -1037,7 +1037,7 @@
   ordl
 )
 
-(trace ordl-insert-node:impl ordl-insert-ft:impl ordl-insert-digit:impl )
+(trace ordl-insert-node:impl ordl-insert-ft:impl ordl-insert-digit:impl)
 
 (provide ordl-size-changed?)
 
@@ -1054,4 +1054,11 @@
   (define int-ordl1 (make-empty-ordl integer-compare))
   (set! int-ordl1 (ordl-insert int-ordl1 0 0 #t))
   (check-equal? (ordl-query int-ordl1 0) (cons 0 0) "Query [(0, 0)] 0 = (0, 0)")
+)
+
+(module+ test
+  (define int-ordl2 (make-empty-ordl integer-compare))
+  (set! int-ordl2 (ordl-insert int-ordl2 0 "int" #f))
+  (set! int-ordl2 (ordl-insert int-ordl2 0 "float" #f))
+  (check-equal? (ordl-query int-ordl2 0) (cons 0 "int") "Query [(0, int)] 0 = (0, int)")
 )
