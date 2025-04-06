@@ -106,7 +106,7 @@
     [(Empty) (Single v)]
     [(Single a)
       (match-define (FingerTree _ _ as) core)
-      (define v^ (as (measure:node core v depth) (measure:node core a depth)))
+      (define v^ (as (measure:node core a depth) (measure:node core v depth)))
       (Deep v^ (One a) (Empty) (One v))
     ]
     [(Deep v^ left inner right)
@@ -390,3 +390,14 @@
 )
 
 (provide build-ft0 hdL-view hdR-view)
+
+(define (list->digit lst _depth)
+  (match lst
+    [`(,a ,b ,c ,d) (Four a b c d)]
+    [`(,a ,b ,c) (Three a b c)]
+    [`(,a ,b) (Two a b)]
+    [`(,a) (One a)]
+  )
+)
+
+(provide list->digit)

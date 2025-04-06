@@ -108,14 +108,6 @@
     ]
   )
 )
-(define (list->digit lst _depth)
-  (match lst
-    [`(,a ,b ,c ,d) (Four a b c d)]
-    [`(,a ,b ,c) (Three a b c)]
-    [`(,a ,b) (Two a b)]
-    [`(,a) (One a)]
-  )
-)
 (define (ral-set-digit:impl digit idx value depth)
   (define lst (digit-add-list digit '()))
   (define m (update-in-list lst idx value depth))
