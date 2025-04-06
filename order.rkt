@@ -964,6 +964,23 @@
   )
 )
 
+(define (ordl-delete-ft-wrap ft cmp-fn key)
+  (match ft
+    [(Empty) (values ft #f)]
+    [(Single _) (match-define-values (ft^ _ ret) (ordl-delete-ft:impl ft cmp-fn key 0)) (values ft^ ret)]
+    [(Deep o _ _ _) (match (cmp-fn o key)
+      [(or 'lt 'eq) (ordl-delete-ft:impl ft cmp-fn key 0)]
+      ['gt (values ft #f)]
+    )]
+  )
+)
+
+(define (ordl-delete-ft ft key)
+  (match-define (Ordl cmp-fn ft^) ft)
+  (match-define-values (ft^^ ret) (ordl-delete-ft-wrap ft^ cmp-fn key))
+  (values (if (eq? ft^ ft^^) ft (Ordl cmp-fn ft^^)) ret)
+)
+
 (define (integer-compare x0 x1)
   (cond
     [(< x0 x1) 'lt]
