@@ -96,20 +96,23 @@
 
 (define (ordl-query-ft:impl ft cmp-fn key depth)
   (match ft
+    [(Empty) #f]
     [(Single node) (ordl-query-node:impl node cmp-fn key depth)]
     [(Deep _ left inner right)
       (define right-v (ordl-min-key-digit right depth))
       (define right-v-cmp-rst (cmp-fn right-v key))
       (match right-v-cmp-rst
         [(or 'eq 'lt) (ordl-query-digit:impl right cmp-fn key depth)]
-        ['gt
+        ['gt (=> f)
+          (match inner [(Empty) (f)] [_ (void)])
           (define inner-v (ordl-min-key-ft inner (add1 depth)))
           (define inner-v-cmp-rst (cmp-fn inner-v key))
           (match inner-v-cmp-rst
             [(or 'eq 'lt) (ordl-query-ft:impl inner cmp-fn key (add1 depth))]
-            ['gt (ordl-query-digit:impl left cmp-fn key depth)]
+            ['gt (f)]
           )
         ]
+        ['gt (ordl-query-digit:impl left cmp-fn key depth)]
       )
     ]
   )
@@ -1002,6 +1005,8 @@
   (Ordl cmp-fn (Empty))
 )
 
+(define (make-empty-ordl cmp-fn) (Ordl cmp-fn (Empty)))
+
 (define (test6)
   (define ordl (make-ordl-empty symbol-compare))
   (define append '((name . "Code - Insiders") (publish . 2025) (Window . 1.0)))
@@ -1035,3 +1040,13 @@
 (trace ordl-insert-node:impl ordl-insert-ft:impl ordl-insert-digit:impl )
 
 (provide ordl-size-changed?)
+
+(module+ test
+  (require rackunit)
+)
+
+(module+ test
+  (define int-ordl (make-empty-ordl integer-compare))
+  ; query 
+  (check-equal? (ordl-query int-ordl 0) #f "Query [Empty] 0 = #f")
+)
