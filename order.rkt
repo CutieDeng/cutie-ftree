@@ -1046,7 +1046,12 @@
 )
 
 (module+ test
-  (define int-ordl (make-empty-ordl integer-compare))
-  ; query 
-  (check-equal? (ordl-query int-ordl 0) #f "Query [Empty] 0 = #f")
+  (define int-ordl0 (make-empty-ordl integer-compare))
+  (check-equal? (ordl-query int-ordl0 0) #f "Query [Empty] 0 = #f")
+)
+
+(module+ test
+  (define int-ordl1 (make-empty-ordl integer-compare))
+  (set! int-ordl1 (ordl-insert int-ordl1 0 0 #t))
+  (check-equal? (ordl-query int-ordl1 0) (cons 0 0) "Query [(0, 0)] 0 = (0, 0)")
 )
