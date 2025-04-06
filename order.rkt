@@ -200,7 +200,7 @@
             (cond
               [(and (eq? x0 node0) (not node1)) (values node #f)]
               [node1 (values (Node3 k0 node0 node1 x1) #f)]
-              [(not node1) (values (Node2 k0 node0 x1))])
+              [(not node1) (values (Node2 k0 node0 x1) #f)])
           ]
         )
       ]
@@ -218,7 +218,7 @@
                     (Node2 k0 x0 x1)
                     (Node2 (ordl-min-key-node node0 (sub1 depth)) node0 node1))]
                   [(not node1)
-                    (values (Node3 k0 x0 x1 node0))]
+                    (values (Node3 k0 x0 x1 node0) #f)]
                 )
               ]
               ['gt (define-values (node0 node1)
@@ -229,7 +229,7 @@
                     (Node2 k0 x0 node0)
                     (Node2 (ordl-min-key-node node1 (sub1 depth)) node1 x2))]
                   [(not node1)
-                    (values (Node3 k0 x0 node0 x2))]
+                    (values (Node3 k0 x0 node0 x2) #f)]
                 )
               ]
             )
@@ -242,7 +242,7 @@
                 (Node2 k0 x0 node0)
                 (Node2 (ordl-min-key-node node1 (sub1 depth)) node1 x2))]
               [(not node1)
-                (values (Node3 k0 x0 node0 x2))]
+                (values (Node3 k0 x0 node0 x2) #f)]
             )
           ]
           ['gt (define-values (node0 node1)
@@ -253,7 +253,7 @@
                 (Node2 k0 node0 node1)
                 (Node2 k1 x1 x2))]
               [(not node1)
-                (values (Node3 k0 node0 x1 x2))]
+                (values (Node3 k0 node0 x1 x2) #f)]
             )
           ]
         )
@@ -278,7 +278,7 @@
           (define-values (node0 node1) (ordl-insert-node:impl x cmp-fn key value depth replace?))
           (cond
             [(and (eq? x node0) (not node1)) ft]
-            [node1 (Deep (ordl-min-key-node node0 depth) node0 (Empty) node1)]
+            [node1 (Deep (ordl-min-key-node node0 depth) (One node0) (Empty) (One node1))]
             [(not node1) (Single node0)]
           )
         ]
@@ -1094,4 +1094,13 @@
   ))
   (check-equal? (ordl-query int-ordl6 7) (cons 7 8))
   (check-equal? (ordl-query int-ordl6 10) #f)
+)
+
+(module+ test
+  (define int-ordl7 (make-empty-ordl integer-compare))
+  (set! int-ordl7 (for/fold ([io int-ordl7]) ([i (in-range 10)])
+    (ordl-insert io (- 20 i) (add1 i) #f)
+  ))
+  (check-equal? (ordl-query int-ordl7 0) #f)
+  (check-equal? (ordl-query int-ordl7 11) (cons 11 10))
 )

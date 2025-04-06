@@ -17,7 +17,7 @@
 ; Finger Tree
 (struct Empty () #:transparent)
 (struct Single (a) #:transparent)
-(struct Deep (v left inner right) #:transparent)
+(struct Deep (v left inner right) #:transparent #:guard (struct-guard/c any/c Digit?/c any/c Digit?/c))
 (define finger-tree? (or/c Empty? Single? Deep?))
 (provide finger-tree?)
 
@@ -401,3 +401,5 @@
 )
 
 (provide list->digit)
+
+; (provide (contract-out [Deep (-> any/c Digit?/c any/c Digit?/c Deep?)]))
