@@ -1104,3 +1104,11 @@
   (check-equal? (ordl-query int-ordl7 0) #f)
   (check-equal? (ordl-query int-ordl7 11) (cons 11 10))
 )
+
+(module+ test
+  (define int-ordl8 (make-empty-ordl integer-compare))
+  ; drop
+  (define-values (int-ordl8^ ret) (ordl-delete-ft int-ordl8 1))
+  (check-equal? ret #f)
+  (check-eq? int-ordl8 int-ordl8^)
+)
