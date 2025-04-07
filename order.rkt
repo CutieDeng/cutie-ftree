@@ -13,6 +13,11 @@
   (lambda () #f) (match-lambda [(cons k _) k]) (lambda (k0 k1) k0)
 ))
 
+(define (ordl-empty? ordl)
+  (match-define (Ordl _ f) ordl)
+  (match f [(Empty) #t] [_ #f])
+)
+
 (define (ordl-min o)
   (match-define (Ordl _ f) o)
   (hdL-view f)
@@ -904,7 +909,7 @@
 (define (ordl-delete-ft:impl ft cmp-fn key depth)
   (match ft
     [(Deep o left inner right)
-      (define right-v (ordl-min-key-ft right depth))
+      (define right-v (ordl-min-key-digit right depth))
       (match (cmp-fn right-v key)
         [(or 'lt 'eq)
           (match-define-values (right^ subright ret) (ordl-delete-digit:impl right cmp-fn key depth))
@@ -924,7 +929,36 @@
             [_ (define inner-v (ordl-min-key-ft inner (add1 depth)))
               (match (cmp-fn inner-v key)
                 [(or 'lt 'eq)
-                  (error (ordl-delete-ft:impl inner cmp-fn key (add1 depth)))
+                  (match-define-values (inner^ subinner ret) (ordl-delete-ft:impl inner cmp-fn key (add1 depth)))
+                  (cond
+                    [(eq? inner inner^) (values ft #f ret)]
+                    [inner^ (values (Deep o left inner^ right) #f ret)]
+                    [subinner (begin
+                      (match* (left right)
+                        [((Four x0 x1 x2 x3) (Four _ _ _ _))
+                          (define node0 (Node3 (ordl-min-key-node x2 depth) x2 x3 subinner))
+                          (define left^ (Two x0 x1))
+                          (Deep o left^ (Single node0) right)
+                        ]
+                        [((Four _ _ _ _) _)
+                          (define right^ (match right
+                            [(One x) (Two subinner x)]
+                            [(Two x0 x1) (Three subinner x0 x1)]
+                            [(Three x0 x1 x2) (Four subinner x0 x1 x2)]
+                          ))
+                          (Deep o left (Empty) right^)
+                        ]
+                        [(_ _)
+                          (define left^ (match left
+                            [(One x) (Two x subinner)]
+                            [(Two x0 x1) (Three x0 x1 subinner)]
+                            [(Three x0 x1 x2) (Four x0 x1 x2 subinner)]
+                          ))
+                          (Deep o left^ (Empty) right)
+                        ]
+                      )
+                    )]
+                  )
                 ]
                 ['gt (h)]
               )
@@ -972,7 +1006,9 @@
     [(Empty) (values ft #f)]
     [(Single _) (match-define-values (ft^ _ ret) (ordl-delete-ft:impl ft cmp-fn key 0)) (values ft^ ret)]
     [(Deep o _ _ _) (match (cmp-fn o key)
-      [(or 'lt 'eq) (ordl-delete-ft:impl ft cmp-fn key 0)]
+      [(or 'lt 'eq) 
+        (match-define-values (ft^ _ ret) (ordl-delete-ft:impl ft cmp-fn key 0))
+        (values ft^ ret)]
       ['gt (values ft #f)]
     )]
   )
@@ -1111,4 +1147,13 @@
   (define-values (int-ordl8^ ret) (ordl-delete-ft int-ordl8 1))
   (check-equal? ret #f)
   (check-eq? int-ordl8 int-ordl8^)
+)
+
+(module+ test
+  (define int-ordl9 (for/fold ([o (make-empty-ordl integer-compare)]) ([i (in-range 15)])
+    (ordl-insert o i i #f)    
+  ))
+  (define-values (int-ordl9^ nine) (ordl-delete-ft int-ordl9 9))
+  (check-equal? nine (cons 9 9))
+  (check-false (ordl-empty? int-ordl9^))
 )
