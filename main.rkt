@@ -280,7 +280,7 @@
     [(Single v)
       (cond
         [(>= idx (measure:node core/size v depth)) (assert-unreachable)]
-        [(values idx (ral-empty) v (ral-empty))]
+        [else (values idx (ral-empty) v (ral-empty))]
       )
     ]
     [(Deep v lhs inner rhs)
@@ -297,12 +297,12 @@
               (values idx^ left m (build-ft0 core/size right inner^ rhs depth))])]
         [(< idx inner-measure) 
           ; lhs (l m r) rhs
-          (define-values (l m r) (ral-split:impl inner (- idx lhs-measure) (add1 depth))) 
+          (define-values (rest-idx l m r) (ral-split:impl inner (- idx lhs-measure) (add1 depth))) 
           ; (printf "debug, l: ~a, m: ~a, r: ~a\n" l m r)
           (define left (left-digit+ft->ft lhs l depth))
           (define right (right-digit+ft->ft rhs r depth))
           ; (printf "debug, left: ~a; right: ~a\n" left right)
-          (define-values (idx^ l^ m^ r^) (ral-split-node:impl m (- idx lhs-measure) (add1 depth)))
+          (define-values (idx^ l^ m^ r^) (ral-split-node:impl m rest-idx (add1 depth)))
           (define left^ (for/fold ([init left]) ([i l^]) (consR:impl core/size init i)))
           (define right^ (for/foldr ([init right]) ([i r^]) (consL:impl core/size init i)))
           (values idx^ left^ m^ right^)
@@ -311,7 +311,7 @@
           ; lhs inner (l m r)
           (define right (digit-list->ft r depth))
           (match inner
-            [(Empty) (values (digit-list2->ft (append (digit-add-list lhs '()) l) depth) m right)]
+            [(Empty) (values idx^ (digit-list2->ft (append (digit-add-list lhs '()) l) depth) m right)]
             [_ 
               (define-values (left inner^) (digit-list+ft->digit r inner depth hdR:impl))
               (values idx^ (build-ft0 core/size lhs inner^ left depth) m right)])]
@@ -513,3 +513,65 @@
 
 (define ral? finger-tree?)
 (provide ral?)
+
+(module+ test (require rackunit))
+
+(module+ test
+  (let ([l (ral-empty)])
+    (set! l (ral-consr l 1))
+    (set! l (ral-consr l 1))
+    (set! l (ral-consr l 1))
+    (set! l (ral-consr l 1))
+    (set! l (ral-consr l 1))
+    (set! l (ral-consr l 1))
+    (set! l (ral-consr l 1))
+    (define sum-v (for/fold ([sum 0]) ([i (in-range (ral-length l))])
+      (define v (ral-ref l i))
+      (+ sum v)
+    ))
+    (check-equal? 7 sum-v)
+  )
+)
+
+(module+ test
+  (let ([l (ral-empty)])
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (define sum-v (for/fold ([sum 0]) ([i (in-range (ral-length l))])
+      (define v (ral-ref l i))
+      (+ sum v)
+    ))
+    (check-equal? 7 sum-v)
+  )
+)
+
+(module+ test
+  (let ([l (ral-empty)])
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (set! l (ral-consl l 1))
+    (define-values (l1 l2) (ral-split-at l 4))
+    (define sum-v1 (for/fold ([sum 0]) ([i (in-range (ral-length l1))])
+      (define v (ral-ref l1 i))
+      (+ sum v)
+    ))
+    (define sum-v2 (for/fold ([sum 0]) ([i (in-range (ral-length l2))])
+      (define v (ral-ref l2 i))
+      (+ sum v)
+    ))
+    (check-equal? 4 sum-v1)
+    (check-equal? 3 sum-v2)
+  )
+)
+
+(require racket/trace)
+(trace ral-split:impl ral-split)
