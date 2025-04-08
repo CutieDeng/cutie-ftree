@@ -640,6 +640,68 @@
           ]
         )
       ]
+      [(Node3 k0 x0 x1 x2)
+        (match (cmp-fn (ordl-min-key-node x1 depth) key)
+          ['lt (=> h)
+            (match (cmp-fn (ordl-min-key-node x2 depth) key)
+              [(or 'lt 'eq)
+                (define-values (node0 subnode ret) (ordl-delete-node:impl x2 cmp-fn key (sub1 depth)))
+                (match* (node0 subnode)
+                  [(_ #f) (if (eq? x2 node0) (values node #f ret) (values (Node3 k0 x0 x1 node0) #f ret))]
+                  [(#f _) (match x1
+                    [(Node2 _ x10 x11)
+                      (define node0^ (Node3 (ordl-min-key-node x10 (- depth 2)) x10 x11 subnode))
+                      (values (Node2 k0 x0 node0^) #f ret)
+                    ]
+                    [(Node3 _ x10 x11 x12)
+                      (define node^ (Node3 k0 x0 (Node2 (ordl-min-key-node x10 (- depth 2)) x10 x11) 
+                        (Node2 (ordl-min-key-node x12 (- depth 2)) x12 subnode)))
+                      (values node^ #f ret)
+                    ]
+                  )]
+                )
+              ]
+              ['gt (h)]
+            )
+          ]
+          [(or 'lt 'eq)
+            (define-values (node0 subnode ret) (ordl-delete-node:impl x1 cmp-fn key (sub1 depth)))
+            (match* (node0 subnode)
+              [(_ #f) (if (eq? x1 node0) (values node #f ret) (values (Node3 k0 x0 node0 x2) #f ret))]
+              [(#f _) (match x2
+                [(Node2 _ x20 x21)
+                  (define node0^ (Node3 (ordl-min-key-node subnode (- depth 2)) subnode x20 x21))
+                  (values (Node2 k0 x0 node0^) #f ret)
+                ]
+                [(Node3 _ x20 x21 x22)
+                  (define node^ (Node3 k0 x0 (Node2 (ordl-min-key-node subnode (- depth 2)) subnode x20) 
+                    (Node2 (ordl-min-key-node x21 (- depth 2)) x21 x22)))
+                  (values node^ #f ret)
+                ]
+              )]
+            )
+          ]
+          ['gt
+            (define-values (node0 subnode ret) (ordl-delete-node:impl x0 cmp-fn key (sub1 depth)))
+            (match* (node0 subnode)
+              [(_ #f) (if (eq? x0 node0) (values node #f ret) 
+                (values (Node3 (ordl-min-key-node node0 (sub1 depth)) node0 x1 x2) #f ret))]
+              [(#f _) (match x1
+                [(Node2 _ x10 x11)
+                  (define subnode^ (Node3 (ordl-min-key-node subnode (- depth 2)) subnode x10 x11))
+                  (values (Node2 (ordl-min-key-node subnode^ (sub1 depth)) subnode^ x2) #f ret)
+                ]
+                [(Node3 _ x10 x11 x12)
+                  (define k0^ (ordl-min-key-node subnode (- depth 2)))
+                  (define node^ (Node3 k0^ 
+                    (Node2 k0^ subnode x10) (Node2 (ordl-min-key-node x11 (- depth 2)) x11 x12) x2))
+                  (values node^ #f ret)
+                ]
+              )]
+            )
+          ]
+        )
+      ]
     )]
   )
 )
@@ -1156,4 +1218,12 @@
   (define-values (int-ordl9^ nine) (ordl-delete-ft int-ordl9 9))
   (check-equal? nine (cons 9 9))
   (check-false (ordl-empty? int-ordl9^))
+)
+
+(module+ test
+  (define int-ordl10 (for/foldr ([o (make-empty-ordl integer-compare)]) ([i (in-range 31)])
+    (ordl-insert o i i #f)
+  ))
+  (define-values (int-ordl10^ ten) (ordl-delete-ft int-ordl10 10))
+  (check-equal? ten (cons 10 10))
 )
