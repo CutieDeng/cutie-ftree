@@ -22,7 +22,6 @@
 (provide finger-tree?)
 
 (struct FingerTree (empty-value measure assoc))
-(struct FingerTreeWrap (core ft))
 
 (provide FingerTree Empty Single Deep Node2 Node3 One Two Three Four Digit?/c Node?/c)
 (provide measure:node measure:ft measure:digit consL:impl consR:impl hdL:impl hdR:impl )
@@ -96,11 +95,6 @@
   )
 )
 
-(define (consL ft v)
-  (match-define (FingerTreeWrap core ft^) ft)
-  (FingerTreeWrap core (consL:impl core ft^ v))
-)
-
 (define (consR:impl core ft v [depth 0])
   (match ft
     [(Empty) (Single v)]
@@ -133,17 +127,6 @@
       )
     ]
   )
-)
-
-(define (consR ft v)
-  (match-define (FingerTreeWrap core ft^) ft)
-  (FingerTreeWrap core (consR:impl core ft^ v))
-)
-
-(define (hdL ft)
-  (match-define (FingerTreeWrap core f) ft)
-  (define-values (h f^) (hdL:impl core f))
-  (values h (FingerTreeWrap core f^))
 )
 
 (define (hdL:impl core ft [depth 0])
@@ -209,11 +192,6 @@
   )
 )
 
-(define (debug:getMaxDepth ft)
-  (match-define (FingerTreeWrap core ft^) ft)
-  (debug:getMaxDepth:impl core ft^)
-)
-
 (define (debug:getMaxDepth:impl core ft [depth 0])
   (match ft
     [(Deep _ _ inner _)
@@ -221,18 +199,6 @@
     ]
     [(or (Empty) (Single _)) depth]
   )
-)
-
-(define (make-empty-finger-tree empty-value measure assoc)
-  (FingerTreeWrap (FingerTree empty-value measure assoc) (Empty))
-)
-
-(define size-core (FingerTree (lambda () 0) (lambda (_) 1) +))
-(define only-left (FingerTree (lambda () #f) (lambda (x) x) (lambda (l r) (if l l r))))
-
-(define (finger-tree:measure-value ft)
-  (match-define (FingerTreeWrap core f) ft)
-  (measure:ft core f 0)
 )
 
 (define (hdR:impl core ft [depth 0])
@@ -298,12 +264,6 @@
   )
 )
 
-(define (hdR ft)
-  (match-define (FingerTreeWrap core f) ft)
-  (define-values (h f^) (hdR:impl core f))
-  (values h (FingerTreeWrap core f^))
-)
-
 (define (digit-add-list digit rest)
   (match digit
     [(One a) (cons a rest)]
@@ -353,13 +313,6 @@
       (Deep v^ lhs-left inner^ rhs-right)
     ]
   )
-)
-
-(define (concat lhs rhs)
-  (unless (eq? (FingerTreeWrap-core lhs) (FingerTreeWrap-core rhs)) (error 'concat "Mismatch concat of different finger tree"))
-  (match-define (FingerTreeWrap core f) lhs)
-  (match-define (FingerTreeWrap _ f2) rhs)
-  (FingerTreeWrap core (concat:impl core f f2))
 )
 
 (define (build-ft0 core lhs inner rhs depth)
