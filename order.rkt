@@ -4,7 +4,6 @@
 
 (require racket/match racket/bool)
 (require racket/trace)
-(require errortrace)
 (require "core.rkt")
 
 (struct Ordl (cmp-fn ft) #:transparent)
@@ -1227,3 +1226,36 @@
   (define-values (int-ordl10^ ten) (ordl-delete-ft int-ordl10 10))
   (check-equal? ten (cons 10 10))
 )
+
+(module+ test
+  (let ([int-ordl-test (make-empty-ordl integer-compare)])
+    (set! int-ordl-test (ordl-insert int-ordl-test 1 "one" #f))
+    (set! int-ordl-test (ordl-insert int-ordl-test 2 "two" #f))
+    (check-equal? (ordl-query int-ordl-test 1) (cons 1 "one") "Query for key 1 should return (1 . \"one\")")
+  )
+)
+
+(module+ test
+  (require racket/format)
+  (let ([large-ordl (make-empty-ordl integer-compare)])
+    ; Insert 20 elements
+    (for ([i (in-range 20)])
+      (set! large-ordl (ordl-insert large-ordl i (string-append "value" (~a i)) #f)))
+    ; Check if all inserted elements can be queried correctly
+    (for ([i (in-range 20)])
+      (check-equal? (ordl-query large-ordl i) (cons i (string-append "value" (~a i))) (format "Query for key ~a" i)))
+    ; Delete some elements and verify
+    (define delete-keys '(5 10 15))
+    (for ([key delete-keys])
+      (define-values (new-ordl deleted-val) (ordl-delete-ft large-ordl key))
+      (check-equal? deleted-val (cons key (string-append "value" (~a key))) (format "Delete key ~a" key))
+      (set! large-ordl new-ordl)
+      (check-false (ordl-query large-ordl key) (format "Query for deleted key ~a should return #f" key)))
+        ; Insert some keys again
+    (for ([key delete-keys])
+      (set! large-ordl (ordl-insert large-ordl key (string-append "newvalue" (~a key)) #t))
+      (check-equal? (ordl-query large-ordl key) (cons key (string-append "newvalue" (~a key))) (format "Query for reinserted key ~a" key)))
+  )
+)
+
+

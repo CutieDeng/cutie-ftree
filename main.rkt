@@ -575,3 +575,9 @@
 
 (require racket/trace)
 (trace ral-split:impl ral-split)
+
+(module+ test
+  (let ([l (ral-empty)])
+    l
+  )
+)
