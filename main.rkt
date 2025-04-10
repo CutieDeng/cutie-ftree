@@ -576,12 +576,6 @@
 (require racket/trace)
 (trace ral-split:impl ral-split)
 
-(module+ test
-  (let ([l (ral-empty)])
-    l
-  )
-)
-
 (define (ral-insert-ft:impl ft idx value depth)
   (match ft
     [(Single x) 
