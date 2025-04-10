@@ -581,3 +581,146 @@
     l
   )
 )
+
+(define (ral-insert-ft:impl ft idx value depth)
+  (match ft
+    [(Single x) 
+      (define-values (x0 x1) (ral-insert-node:impl x idx value depth))
+      (if x1 (Deep (add1 (measure:ft core/size ft depth)) (One x0) (Empty) (One x1)) (Single x0))
+    ]
+    [(Deep o left inner right)
+      (define left-size (measure:digit core/size left depth))
+      (define inner-size (measure:ft core/size inner (add1 depth)))
+      (define left-inner-size (+ left-size inner-size))
+      (cond
+        [(<= left-inner-size idx)
+          (define right^ (ral-insert-digit:impl right (- idx left-inner-size) value depth))
+          (match right^
+            [`(,x0 ,x1 ,x2, x3 ,x4)
+              (define right-pop (build-node3 core/size x0 x1 x2 depth))
+              (define inner^ (consR:impl core/size inner right-pop (add1 depth)))
+              (Deep (add1 o) left inner^ (Two x3 x4))
+            ]
+            [_ (Deep (add1 o) left inner (list->digit right^ depth))]
+          )
+        ]
+        [(<= left-size idx)
+          (define inner^ (ral-insert-ft:impl inner (- idx left-size) value (add1 depth)))
+          (Deep (add1 o) left inner^ right)
+        ]
+        [else
+          (define left^ (ral-insert-digit:impl left idx value depth))
+          (match left^
+            [`(,x0 ,x1 ,x2, x3 ,x4)
+              (define left-pop (build-node3 core/size x2 x3 x4 depth))
+              (define inner^ (consL:impl core/size inner left-pop (add1 depth)))
+              (Deep (add1 o) (Two x0 x1) inner^ right)
+            ]
+            [_ (Deep (add1 o) (list->digit left^ depth) inner right)]
+          )
+        ]
+      )
+    ]
+  )
+)
+
+; return list
+(define (ral-insert-digit:impl digit idx value depth)
+  (define l (digit->list digit))
+  (match-define-values (r _ i)
+    (for/fold ([rst '()] [idx idx] [ignore #f]) ([i l])
+      (define s (measure:node core/size i depth))
+      (cond
+        [ignore
+          (values (cons i rst) idx ignore)
+        ]
+        [(<= s idx)
+          (values (cons i rst) (- idx s) ignore)
+        ]
+        [else
+          (define-values (x0 x1) (ral-insert-node:impl i idx value depth))
+          (if x1 
+            (values (cons x1 (cons x0 rst)) idx #t)
+            (values (cons x0 rst) idx #t)
+          )
+        ]
+      )
+    )
+  )
+  (unless i (assert-unreachable))
+  (reverse r)
+)
+
+(define (ral-insert-node:impl node idx value depth)
+  (match depth
+    [0 (values value node)]
+    [_ (match node
+      [(Node2 i x0 x1)
+        (define x0-size (measure:node core/size x0 (sub1 depth)))
+        (cond
+          [(<= x0-size idx)
+            (define-values (x1^ x2^) (ral-insert-node:impl x1 (- idx x0-size) value (sub1 depth)))
+            (values (if x2^ (Node3 (add1 i) x0 x1^ x2^) (Node2 (add1 i) x0 x1^)) #f)
+          ]
+          [else
+            (define-values (x0^ x1^) (ral-insert-node:impl x0 idx value (sub1 depth)))
+            (values (if x1^ (Node3 (add1 i) x0^ x1^ x1) (Node2 (add1 i) x0^ x1)) #f)
+          ]
+        )
+      ]
+      [(Node3 i x0 x1 x2)
+        (define x0-size (measure:node core/size x0 (sub1 depth)))
+        (define x1-size (measure:node core/size x1 (sub1 depth)))
+        (define x0-x1-size (+ x0-size x1-size))
+        (cond
+          [(<= x0-x1-size idx)
+            (define-values (x2^ x3^)
+              (ral-insert-node:impl x2 (- idx x0-x1-size) value (sub1 depth)))
+            (if x3^ (values (Node2 x0-x1-size x0 x1) (Node2 (+
+                (measure:node core/size x2^ (sub1 depth)) (measure:node core/size x3^ (sub1 depth)))
+                x2^ x3^))
+              (values (Node3 (+ i 1) x0 x1 x2^) #f))
+          ]
+          [(<= x0-size idx)
+            (define-values (x1^ x2^)
+              (ral-insert-node:impl x1 (- idx x0-size) value (sub1 depth)))
+            (if x2^ (values (Node2 (+ x0-size (measure:node core/size x1^ (sub1 depth))) x0 x1^)
+              (Node2 (+ (measure:node core/size x2^ (sub1 depth)) (measure:node core/size x2 (sub1 depth)))
+                x2^ x2))
+              (values (Node3 (+ i 1) x0 x1 x2^) #f))
+          ]
+          [else
+            (define-values (x0^ x1^) (ral-insert-node:impl x0 idx value (sub1 depth)))
+            (if x1^ (values (Node2 (+ (measure:node core/size x0^ (sub1 depth)) (measure:node core/size x1^ (sub1 depth))) x0^ x1^)
+              (Node2 (+ (measure:node core/size x1 (sub1 depth)) (measure:node core/size x2 (sub1 depth)))
+                x1 x2))
+              (values (Node3 (+ i 1) x0^ x1 x2) #f))
+          ]
+        )
+      ]
+    )]
+  )
+)
+
+(define (ral-insert ft idx value)
+  (define ft-size (measure:ft core/size ft 0))
+  (cond
+    [(= ft-size idx) (consR:impl core/size ft value 0)]
+    [(< ft-size idx) (error 'ArgumentError "insert invalid pos ~a in ft (sz ~a)" idx ft-size)]
+    [else (ral-insert-ft:impl ft idx value 0)]
+  )
+)
+
+(module+ test
+  (let ([f (ral-empty)])
+    (set! f (for/fold ([f f]) ([i (in-range 10)]) (ral-insert f 0 i)))
+    (check-equal? (ral-length f) 10)
+  )
+)
+
+(module+ test
+  (let ([f (ral-consl (ral-empty) 5)])
+    (set! f (for/fold ([f f]) ([i (in-range 10)]) (ral-insert f 1 i)))
+    (check-equal? (ral-length f) 11)
+  )
+)

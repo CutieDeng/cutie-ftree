@@ -273,6 +273,17 @@
   )
 )
 
+(define (digit->list digit)
+  (match digit
+    [(One a) (list a)]
+    [(Two a b) (list a b)]
+    [(Three a b c) (list a b c)]
+    [(Four a b c d) (list a b c d)]
+  )
+)
+
+(provide digit->list)
+
 ; 2 .. 8
 (define (list->nodes:impl core rest depth)
   (match-define (FingerTree _ _ as) core)
@@ -356,3 +367,12 @@
 (provide list->digit)
 
 ; (provide (contract-out [Deep (-> any/c Digit?/c any/c Digit?/c Deep?)]))
+
+(define (build-node3 core x0 x1 x2 depth)
+  (match-define (FingerTree _ _ as) core)
+  (define c (as (as (measure:node core x0 depth) (measure:node core x1 depth)) 
+    (measure:node core x2 depth)))
+  (Node3 c x0 x1 x2)
+)
+
+(provide build-node3)
