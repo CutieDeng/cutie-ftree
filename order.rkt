@@ -1484,3 +1484,19 @@
     (check-equal? cnt 100)
   )
 )
+
+(module+ test
+  (let ([t (ordl-make-empty integer-compare)])
+    (set! t (for/fold ([t t]) ([i (in-range 100)])
+      (ordl-insert t i i #f)))
+    (define cnt (let loop ([current (ordl-max t)] [cnt 0])
+      (cond
+        [current 
+          (loop (ordl-query-weak-ft t (car current) 'lt) (add1 cnt))
+        ]
+        [else cnt]
+      )
+    ))
+    (check-equal? cnt 100)
+  )
+)
