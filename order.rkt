@@ -1432,7 +1432,7 @@
           (match* ((cmp-fn x1-v key) mode)
             [('eq (or 'le 'ge 'gt)) (ordl-query-weak-node:impl x1 cmp-fn key mode depth)]
             [('lt _) (ordl-query-weak-node:impl x1 cmp-fn key mode depth)]
-            [(_ (or 'lt 'eq)) (ordl-query-weak-node:impl x0 cmp-fn key mode depth)]
+            [(_ (or 'lt 'le)) (ordl-query-weak-node:impl x0 cmp-fn key mode depth)]
           )
         ]
         [(_ _)
@@ -1493,6 +1493,38 @@
       (cond
         [current 
           (loop (ordl-query-weak-ft t (car current) 'lt) (add1 cnt))
+        ]
+        [else cnt]
+      )
+    ))
+    (check-equal? cnt 100)
+  )
+)
+
+(module+ test
+  (let ([t (ordl-make-empty integer-compare)])
+    (set! t (for/fold ([t t]) ([i (in-range 100)])
+      (ordl-insert t i i #f)))
+    (define cnt (let loop ([current (ordl-max t)] [cnt 0])
+      (cond
+        [current 
+          (loop (ordl-query-weak-ft t (sub1 (car current)) 'le) (add1 cnt))
+        ]
+        [else cnt]
+      )
+    ))
+    (check-equal? cnt 100)
+  )
+)
+
+(module+ test
+  (let ([t (ordl-make-empty integer-compare)])
+    (set! t (for/fold ([t t]) ([i (in-range 100)])
+      (ordl-insert t i i #f)))
+    (define cnt (let loop ([current (ordl-min t)] [cnt 0])
+      (cond
+        [current 
+          (loop (ordl-query-weak-ft t (add1 (car current)) 'ge) (add1 cnt))
         ]
         [else cnt]
       )
