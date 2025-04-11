@@ -19,12 +19,18 @@
 
 (define (ordl-min o)
   (match-define (Ordl _ f) o)
-  (hdL-view f)
+  (match f
+    [(Empty) #f]
+    [_ (hdL-view f)]
+  )
 )
 
 (define (ordl-max o)
   (match-define (Ordl _ f) o)
-  (hdR-view f)
+  (match f
+    [(Empty) #f]
+    [_ (hdR-view f)]
+  )
 )
 
 (define (ordl-min-key o)
@@ -1328,16 +1334,16 @@
       (define right-v-cmp-rst (cmp-fn right-v key))
       (match* (right-v-cmp-rst mode)
         [('eq (or 'le 'ge 'gt)) (ordl-query-weak-digit:impl right cmp-fn key mode depth)]
-        [('lt _) (ordl-query-digit:impl right cmp-fn key mode depth)]
+        [('lt _) (ordl-query-weak-digit:impl right cmp-fn key mode depth)]
         [(_ _)
           (match inner 
             [(Empty)
               (match mode
                 [(or 'lt 'le)
-                  (ordl-query-digit:impl left cmp-fn key mode depth)]
+                  (ordl-query-weak-digit:impl left cmp-fn key mode depth)]
                 [_
-                  (define tmp (ordl-query-digit:impl left cmp-fn key mode depth))
-                  (if tmp tmp (ordl-query-digit:impl right cmp-fn key mode depth))
+                  (define tmp (ordl-query-weak-digit:impl left cmp-fn key mode depth))
+                  (if tmp tmp (ordl-query-weak-digit:impl right cmp-fn key mode depth))
                 ]
               )
             ] 
@@ -1346,6 +1352,8 @@
               (define inner-v-cmp-rst (cmp-fn inner-v key))
               (match* (inner-v-cmp-rst mode)
                 [('eq (or 'le 'ge 'gt)) (ordl-query-weak-ft:impl inner cmp-fn key mode (add1 depth))]
+                [('lt (or 'ge 'gt)) (define tmp (ordl-query-weak-ft:impl inner cmp-fn key mode (add1 depth)))
+                  (if tmp tmp (ordl-query-weak-digit:impl right cmp-fn key mode depth))]
                 [('lt _) (ordl-query-weak-ft:impl inner cmp-fn key mode (add1 depth))]
                 [(_ (or 'le 'lt))
                   (ordl-query-weak-digit:impl left cmp-fn key mode depth)]
@@ -1391,7 +1399,7 @@
             [('lt _) (ordl-query-weak-node:impl x2 cmp-fn key mode depth)]
             [(_ (or 'le 'lt)) (ordl-query-weak-node:impl x1 cmp-fn key mode depth)]
             [(_ _) (define tmp (ordl-query-weak-node:impl x1 cmp-fn key mode depth))
-              (if tmp tmp (ordl-query-node:impl x2 cmp-fn key mode depth))]
+              (if tmp tmp (ordl-query-weak-node:impl x2 cmp-fn key mode depth))]
           )
         ]
         [(_ (or 'lt 'le))
@@ -1416,7 +1424,7 @@
             [('lt _) (ordl-query-weak-node:impl x3 cmp-fn key mode depth)]
             [(_ (or 'le 'lt)) (ordl-query-weak-node:impl x2 cmp-fn key mode depth)]
             [(_ _) (define tmp (ordl-query-weak-node:impl x2 cmp-fn key mode depth))
-              (if tmp tmp (ordl-query-node:impl x3 cmp-fn key mode depth))]
+              (if tmp tmp (ordl-query-weak-node:impl x3 cmp-fn key mode depth))]
           )
         ]
         [(_ (or 'lt 'le))
@@ -1458,5 +1466,21 @@
       (ordl-insert t i i #f)))
     (define n1 (ordl-query-weak-ft t -1 'ge))
     (check-equal? n1 (cons 0 0))
+  )
+)
+
+(module+ test
+  (let ([t (ordl-make-empty integer-compare)])
+    (set! t (for/fold ([t t]) ([i (in-range 100)])
+      (ordl-insert t i i #f)))
+    (define cnt (let loop ([current (ordl-min t)] [cnt 0])
+      (cond
+        [current 
+          (loop (ordl-query-weak-ft t (car current) 'gt) (add1 cnt))
+        ]
+        [else cnt]
+      )
+    ))
+    (check-equal? cnt 100)
   )
 )
