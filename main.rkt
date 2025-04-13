@@ -718,3 +718,10 @@
     (check-equal? (ral-length f) 11)
   )
 )
+
+(module+ test
+  (let ([f (ral-consl (ral-empty) 5)])
+    (set! f (for/fold ([f f]) ([i (in-range 20)]) (ral-insert f 1 i)))
+    (check-equal? (ral-length f) 21)
+  )
+)
