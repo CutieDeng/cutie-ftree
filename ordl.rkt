@@ -1553,7 +1553,7 @@
 )
 
 (provide ordl-size-changed?)
-(provide Ordl)
+(provide (struct-out Ordl))
 (provide ordl-empty? ordl-min ordl-max)
 (provide ordl-query ordl-query-weak)
 (provide ordl-delete ordl-insert)

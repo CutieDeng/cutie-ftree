@@ -290,7 +290,7 @@
           ; (l m r) inner rhs
           (define left (digit-list->ft l depth))
           (match inner
-            [(Empty) (values left m (digit-list2->ft (append r (digit-add-list rhs '())) depth))]
+            [(Empty) (values idx^ left m (digit-list2->ft (append r (digit-add-list rhs '())) depth))]
             [_ 
               (define-values (right inner^) (digit-list+ft->digit r inner depth hdL:impl))
               (values idx^ left m (build-ft0 core/size right inner^ rhs depth))])]
