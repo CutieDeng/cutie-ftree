@@ -518,8 +518,8 @@
               (define-values (node0 node1) (ordl-insert-node:impl x0 cmp-fn key value depth replace?))
               (cond
                 [(and (eq? x0 node0) (not node1)) digit]
-                [node1 (list node0 node1 x1)]
-                [(not node1) (list node0 x1)]
+                [node1 (list node0 node1 x1 x2)]
+                [(not node1) (list node0 x1 x2)]
               )
             ]
           )
