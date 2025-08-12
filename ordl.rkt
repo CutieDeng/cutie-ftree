@@ -1003,10 +1003,33 @@
           (match-define-values (right^ subright ret) (ordl-delete-digit:impl right cmp-fn key depth))
           (cond
             [(eq? right right^) (values ft #f ret)]
-            [right^ (define right^^ (list->digit right^ depth)) 
+            [(not (null? right^)) (define right^^ (list->digit right^ depth)) 
               (values (Deep o left inner right^^) #f ret)]
             [subright
               (define ft^ (left-inner-mergeR left inner subright o depth))
+              (values ft^ #f ret)
+            ]
+            [(= depth 0)
+              (define ft^
+                (match inner
+                  [(Empty)
+                    (match left
+                      [(One n) (Single n)]
+                      [(Two n0 n1) (Deep (ordl-min-key-node n0 0) (One n0) (Empty) (One n1))]
+                      [(Three n0 n1 n2) (Deep (ordl-min-key-node n0 0) (Two n0 n1) (Empty) (One n2))]
+                      [(Four n0 n1 n2 n3) (Deep (ordl-min-key-node n0 0) (Two n0 n1) (Empty) (Two n2 n3))]
+                    )
+                  ]
+                  [_
+                    (define-values (new-right inner^) (hdR:impl ordl-core inner 1))
+                    (define right^^
+                      (match new-right
+                        [(Node2 _ n0 n1) (Two n0 n1)]
+                        [(Node3 _ n0 n1 n2) (Three n0 n1 n2)]
+                      ))
+                    (Deep o left inner^ right^^)
+                  ]
+                ))
               (values ft^ #f ret)
             ]
           )
@@ -1022,7 +1045,7 @@
                     [(eq? inner inner^) (values ft #f ret)]
                     [inner^ (values (Deep o left inner^ right) #f ret)]
                     [subinner (begin
-                      (match* (left right)
+                      (define ft^ (match* (left right)
                         [((Four x0 x1 x2 x3) (Four _ _ _ _))
                           (define node0 (Node3 (ordl-min-key-node x2 depth) x2 x3 subinner))
                           (define left^ (Two x0 x1))
@@ -1044,7 +1067,8 @@
                           ))
                           (Deep o left^ (Empty) right)
                         ]
-                      )
+                      ))
+                      (values ft^ #f ret)
                     )]
                   )
                 ]
@@ -1057,18 +1081,42 @@
           (match-define-values (left^ subleft ret) (ordl-delete-digit:impl left cmp-fn key depth))
           (cond
             [(eq? left left^) (values ft #f ret)]
-            [left^ (define left^^ (list->digit left^ depth))
+            [(not (null? left^)) (define left^^ (list->digit left^ depth))
               (values (Deep (ordl-min-key-digit left^^ depth) left^^ inner right) #f ret)
             ]
             [subleft
               (define ft^ (right-inner-mergeL right inner subleft depth))
               (values ft^ #f ret)
             ]
+            [(= depth 0)
+              (define ft^
+                (match inner
+                  [(Empty)
+                    (match right
+                      [(One n) (Single n)]
+                      [(Two n0 n1) (Deep (ordl-min-key-node n0 0) (One n0) (Empty) (One n1))]
+                      [(Three n0 n1 n2) (Deep (ordl-min-key-node n0 0) (Two n0 n1) (Empty) (One n2))]
+                      [(Four n0 n1 n2 n3) (Deep (ordl-min-key-node n0 0) (Two n0 n1) (Empty) (Two n2 n3))]
+                    )
+                  ]
+                  [_
+                    (define-values (new-left inner^) (hdL:impl ordl-core inner 1))
+                    (define-values (left^^ o^)
+                      (match new-left
+                        [(Node2 o^ n0 n1) (values (Two n0 n1) o^)]
+                        [(Node3 o^ n0 n1 n2) (values (Three n0 n1 n2) o^)]
+                      ))
+                    (Deep o^ left^^ inner^ right)
+                  ]
+                ))
+              (values ft^ #f ret)
+            ]
           )
         ]
       )
     ]
-    [(Single (and x (cons k _)))
+    [(Single x)
+      (define k (ordl-min-key-node x depth))
       (match depth
         [0
           (match (cmp-fn k key)

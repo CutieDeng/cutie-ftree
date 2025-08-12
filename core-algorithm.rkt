@@ -293,7 +293,6 @@
       (define inner^ (concat:impl core left-inner^ rhs-inner (add1 depth)))
       (match-define (FingerTreeWrap _ _ as) core)
       (define v^ (as lhs-v rhs-v))
-      (printf "lhs: ~a, rhs: ~a, total: ~a\n" lhs-v rhs-v v^)
       (Deep v^ lhs-left inner^ rhs-right)
     ]
   )
