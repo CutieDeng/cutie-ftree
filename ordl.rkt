@@ -1173,6 +1173,15 @@
   )
 )
 
+(define (string-compare x0 x1)
+  (cond
+    [(string<? x0 x1) '<]
+    [(string=? x0 x1) '=]
+    [(string>? x0 x1) '>]
+    [else (assert-unreachable)]
+  )
+)
+
 (define (make-ordl-empty cmp-fn)
   (Ordl cmp-fn (Empty))
 )
@@ -1606,6 +1615,6 @@
 (provide ordl-query ordl-query-weak)
 (provide ordl-delete ordl-insert)
 (provide ordl-make-empty)
-(provide integer-compare symbol-compare)
+(provide integer-compare symbol-compare string-compare)
 
 ; (trace ordl-insert-node:impl ordl-insert-ft:impl ordl-insert-digit:impl)
