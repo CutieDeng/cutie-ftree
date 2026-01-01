@@ -1,6 +1,9 @@
 #lang racket/base
 
-(require "ral.rkt")
-(require "ordl.rkt")
+(require "pvector.rkt")
+(require "ordered-map.rkt")
+(require "comparator.rkt")
 
-(provide (all-from-out "ral.rkt" "ordl.rkt"))
+(provide (all-from-out "pvector.rkt"))
+(provide (all-from-out "ordered-map.rkt"))
+(provide (all-from-out "comparator.rkt"))
