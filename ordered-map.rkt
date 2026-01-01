@@ -1279,6 +1279,59 @@
     (yield-ft ft 0)))
 
 ;; ========================================
+;; Key/Value only sequences (like in-dict-keys/values)
+;; ========================================
+
+(define (in-ordered-map-keys om)
+  (in-generator
+    (for ([kv (in-ordered-map om)])
+      (yield (car kv)))))
+
+(define (in-ordered-map-values om)
+  (in-generator
+    (for ([kv (in-ordered-map om)])
+      (yield (cdr kv)))))
+
+;; ========================================
+;; for/ordered-map comprehension
+;; ========================================
+
+(require (for-syntax racket/base))
+
+(define-syntax (for/ordered-map stx)
+  (syntax-case stx ()
+    [(_ cmp-fn clauses body ...)
+      #'(for/fold ([m (ordered-map-empty cmp-fn)]) clauses
+          (let ([kv (let () body ...)])
+            (ordered-map-insert m (car kv) (cdr kv) #t)))]))
+
+(define-syntax (for*/ordered-map stx)
+  (syntax-case stx ()
+    [(_ cmp-fn clauses body ...)
+      #'(for*/fold ([m (ordered-map-empty cmp-fn)]) clauses
+          (let ([kv (let () body ...)])
+            (ordered-map-insert m (car kv) (cdr kv) #t)))]))
+
+;; ========================================
+;; Match expander for ordered-map
+;; ========================================
+
+(require racket/match)
+
+;; Match empty ordered-map
+(define-match-expander ordered-map-empty-pat
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_) #'(? ordered-map-empty?)])))
+
+;; Match and extract entries as list: (ordered-map-pairs cmp-pat pairs-pat)
+(define-match-expander ordered-map-pairs
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_ pairs-pat)
+        #'(? ordered-map? (app (lambda (om) (for/list ([kv (in-ordered-map om)]) kv)) pairs-pat))])))
+
+;; ========================================
 ;; Ref and Set (dict-style)
 ;; ========================================
 
@@ -1303,6 +1356,11 @@
 (provide ordered-map-ref ordered-map-set)
 (provide ordered-map-count ordered-map-has-key? ordered-map-keys ordered-map-values)
 (provide in-ordered-map in-ordered-map-reverse in-ordered-map/lazy)
+(provide in-ordered-map-keys in-ordered-map-values)
+;; Comprehensions
+(provide for/ordered-map for*/ordered-map)
+;; Match expanders
+(provide ordered-map-empty-pat ordered-map-pairs)
 
 ;; ========================================
 ;; Weak Query Implementation

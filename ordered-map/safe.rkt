@@ -62,7 +62,16 @@
   ;; Sequence (generator-based)
   [in-ordered-map (-> ordered-map/c sequence?)]
   [in-ordered-map-reverse (-> ordered-map/c sequence?)]
+  [in-ordered-map-keys (-> ordered-map/c sequence?)]
+  [in-ordered-map-values (-> ordered-map/c sequence?)]
 
   ;; Sequence (lazy query-based)
   [in-ordered-map/lazy (-> ordered-map/c sequence?)]
 )
+
+;; Comprehensions (syntax, no contracts needed)
+(require (only-in "../ordered-map.rkt" for/ordered-map for*/ordered-map ordered-map-empty-pat ordered-map-pairs))
+(provide for/ordered-map for*/ordered-map)
+
+;; Match expanders (syntax)
+(provide ordered-map-empty-pat ordered-map-pairs)

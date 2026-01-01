@@ -126,7 +126,15 @@
   ;; Sequence (generator-based)
   [in-pvector (-> pvector/c sequence?)]
   [in-pvector-reverse (-> pvector/c sequence?)]
+  [in-pvector-indexed (-> pvector/c sequence?)]
 
   ;; Sequence (index-based)
   [in-pvector/index (-> pvector/c sequence?)]
 )
+
+;; Comprehensions (syntax, no contracts needed)
+(require (only-in "../pvector.rkt" for/pvector for*/pvector pvector pvector*))
+(provide for/pvector for*/pvector)
+
+;; Match expanders (syntax)
+(provide pvector pvector*)

@@ -530,6 +530,56 @@
 (define (pvector->list pv)
   (for/list ([v (in-pvector pv)]) v))
 
+;; ========================================
+;; Indexed sequence (like in-indexed for lists)
+;; ========================================
+
+(define (in-pvector-indexed pv)
+  (in-indexed (in-pvector pv)))
+
+;; ========================================
+;; for/pvector comprehension
+;; ========================================
+
+(require (for-syntax racket/base))
+
+(define-syntax (for/pvector stx)
+  (syntax-case stx ()
+    [(_ clauses body ...)
+      #'(for/fold ([pv (pvector-empty)]) clauses
+          (pvector-cons-right pv (let () body ...)))]))
+
+(define-syntax (for*/pvector stx)
+  (syntax-case stx ()
+    [(_ clauses body ...)
+      #'(for*/fold ([pv (pvector-empty)]) clauses
+          (pvector-cons-right pv (let () body ...)))]))
+
+;; ========================================
+;; Match expander for pvector
+;; ========================================
+
+(require racket/match)
+
+;; Match empty or specific elements: (pvector) or (pvector a b c)
+(define-match-expander pvector
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_) #'(? pvector-empty?)]
+      [(_ pat ...)
+        #'(? pvector? (app pvector->list (list pat ...)))]))
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_ elem ...) #'(list->pvector (list elem ...))]
+      [_ #'list->pvector])))
+
+;; Match with rest: (pvector* a b . rest)
+(define-match-expander pvector*
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_ pat ... . rest-pat)
+        #'(? pvector? (app pvector->list (list-rest pat ... rest-pat)))])))
+
 ;; Exports
 (provide pvector-delete)
 (provide pvector? pvector-empty?)
@@ -538,7 +588,11 @@
 (provide pvector-view-left pvector-view-right)
 (provide pvector-empty pvector-cons-left pvector-cons-right pvector-pop-left pvector-pop-right pvector-split pvector-append)
 (provide pvector-ref pvector-set pvector-length)
-(provide in-pvector in-pvector-reverse in-pvector/index)
+(provide in-pvector in-pvector-reverse in-pvector/index in-pvector-indexed)
 (provide vector->pvector pvector->vector)
 (provide list->pvector pvector->list)
 (provide pvector-insert)
+;; Comprehensions
+(provide for/pvector for*/pvector)
+;; Match expanders
+(provide pvector pvector*)
