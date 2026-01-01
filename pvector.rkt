@@ -298,6 +298,7 @@
 (define (small-vector->pvector:impl vec depth)
   (define v (for/fold ([v 0]) ([k (in-vector vec)]) (+ v (measure:node core/size k depth))))
   (match vec
+    [(vector) (ft:empty)]
     [(vector x0) (ft:single x0)]
     [(vector x0 x1) (ft:deep v (digit:1 x0) (pvector-empty) (digit:1 x1))]
     [(vector x0 x1 x2) (ft:deep v (digit:1 x0) (pvector-empty) (digit:2 x1 x2))]
