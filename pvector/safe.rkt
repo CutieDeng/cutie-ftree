@@ -13,6 +13,25 @@
 (define index/c
   (flat-named-contract 'index exact-nonnegative-integer?))
 
+;; pvectorof: like listof, checks all elements satisfy the contract
+(define (pvectorof elem/c)
+  (define elem-ctc (coerce-contract 'pvectorof elem/c))
+  (make-contract
+    #:name (build-compound-type-name 'pvectorof elem-ctc)
+    #:first-order (lambda (v)
+      (and (pvector? v)
+           (for/and ([e (in-pvector v)])
+             ((contract-first-order elem-ctc) e))))
+    #:late-neg-projection (lambda (blame)
+      (define elem-proj ((contract-late-neg-projection elem-ctc)
+                         (blame-add-context blame "an element of")))
+      (lambda (v neg-party)
+        (unless (pvector? v)
+          (raise-blame-error blame v #:missing-party neg-party
+            '(expected: "pvector?" given: "~e") v))
+        (for/pvector ([e (in-pvector v)])
+          (elem-proj e neg-party))))))
+
 ;; ========================================
 ;; Contract-Protected Exports
 ;; ========================================
@@ -138,3 +157,6 @@
 
 ;; Match expanders (syntax)
 (provide pvector pvector*)
+
+;; Parameterized contracts
+(provide pvectorof)
