@@ -59,6 +59,10 @@
   [ordered-map-keys (-> ordered-map/c (listof any/c))]
   [ordered-map-values (-> ordered-map/c (listof any/c))]
 
-  ;; Sequence
+  ;; Sequence (generator-based)
   [in-ordered-map (-> ordered-map/c sequence?)]
+  [in-ordered-map-reverse (-> ordered-map/c sequence?)]
+
+  ;; Sequence (lazy query-based)
+  [in-ordered-map/lazy (-> ordered-map/c sequence?)]
 )

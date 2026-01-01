@@ -123,6 +123,10 @@
   [list->pvector (-> list? pvector/c)]
   [pvector->list (-> pvector/c list?)]
 
-  ;; Sequence
+  ;; Sequence (generator-based)
   [in-pvector (-> pvector/c sequence?)]
+  [in-pvector-reverse (-> pvector/c sequence?)]
+
+  ;; Sequence (index-based)
+  [in-pvector/index (-> pvector/c sequence?)]
 )

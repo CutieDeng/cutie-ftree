@@ -112,13 +112,76 @@
     [(>= idx (measure:ft core/size pv 0)) (assert-unreachable)]
     [else (pvector-set:impl pv idx val 0)]))
 
-(define (in-pvector pv)
+;; Original index-based implementation (O(n log n) total)
+(define (in-pvector/index pv)
   (make-do-sequence (lambda () (initiate-sequence
     #:init-pos (cons pv 0)
     #:next-pos (lambda (x) (match-define (cons pv n) x) (cons pv (add1 n)))
     #:pos->element (lambda (x) (match-define (cons pv n) x) (pvector-ref pv n))
     #:continue-with-pos? (lambda (x)
       (match-define (cons pv n) x) (define nt (measure:ft core/size pv 0)) (< n nt))))))
+
+(require racket/generator)
+
+;; Generator-based implementation (O(n) total)
+(define (in-pvector pv)
+  (in-generator
+    (define (yield-node node depth)
+      (match depth
+        [0 (yield node)]
+        [_ (match node
+          [(node:2 _ x0 x1)
+            (yield-node x0 (sub1 depth))
+            (yield-node x1 (sub1 depth))]
+          [(node:3 _ x0 x1 x2)
+            (yield-node x0 (sub1 depth))
+            (yield-node x1 (sub1 depth))
+            (yield-node x2 (sub1 depth))])]))
+    (define (yield-digit digit depth)
+      (match digit
+        [(digit:1 x0) (yield-node x0 depth)]
+        [(digit:2 x0 x1) (yield-node x0 depth) (yield-node x1 depth)]
+        [(digit:3 x0 x1 x2) (yield-node x0 depth) (yield-node x1 depth) (yield-node x2 depth)]
+        [(digit:4 x0 x1 x2 x3) (yield-node x0 depth) (yield-node x1 depth) (yield-node x2 depth) (yield-node x3 depth)]))
+    (define (yield-ft ft depth)
+      (match ft
+        [(ft:empty) (void)]
+        [(ft:single node) (yield-node node depth)]
+        [(ft:deep _ left inner right)
+          (yield-digit left depth)
+          (yield-ft inner (add1 depth))
+          (yield-digit right depth)]))
+    (yield-ft pv 0)))
+
+;; Reverse generator-based implementation
+(define (in-pvector-reverse pv)
+  (in-generator
+    (define (yield-node node depth)
+      (match depth
+        [0 (yield node)]
+        [_ (match node
+          [(node:2 _ x0 x1)
+            (yield-node x1 (sub1 depth))
+            (yield-node x0 (sub1 depth))]
+          [(node:3 _ x0 x1 x2)
+            (yield-node x2 (sub1 depth))
+            (yield-node x1 (sub1 depth))
+            (yield-node x0 (sub1 depth))])]))
+    (define (yield-digit digit depth)
+      (match digit
+        [(digit:1 x0) (yield-node x0 depth)]
+        [(digit:2 x0 x1) (yield-node x1 depth) (yield-node x0 depth)]
+        [(digit:3 x0 x1 x2) (yield-node x2 depth) (yield-node x1 depth) (yield-node x0 depth)]
+        [(digit:4 x0 x1 x2 x3) (yield-node x3 depth) (yield-node x2 depth) (yield-node x1 depth) (yield-node x0 depth)]))
+    (define (yield-ft ft depth)
+      (match ft
+        [(ft:empty) (void)]
+        [(ft:single node) (yield-node node depth)]
+        [(ft:deep _ left inner right)
+          (yield-digit right depth)
+          (yield-ft inner (add1 depth))
+          (yield-digit left depth)]))
+    (yield-ft pv 0)))
 
 (define (pvector-length pv) (measure:ft core/size pv 0))
 
@@ -475,7 +538,7 @@
 (provide pvector-view-left pvector-view-right)
 (provide pvector-empty pvector-cons-left pvector-cons-right pvector-pop-left pvector-pop-right pvector-split pvector-append)
 (provide pvector-ref pvector-set pvector-length)
-(provide in-pvector)
+(provide in-pvector in-pvector-reverse in-pvector/index)
 (provide vector->pvector pvector->vector)
 (provide list->pvector pvector->list)
 (provide pvector-insert)

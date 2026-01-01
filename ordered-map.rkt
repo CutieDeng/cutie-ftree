@@ -1204,9 +1204,10 @@
 ;; Sequence support
 ;; ========================================
 
-(require racket/sequence)
+(require racket/sequence racket/generator)
 
-(define (in-ordered-map om)
+;; Original lazy implementation using query-weak (renamed)
+(define (in-ordered-map/lazy om)
   (make-do-sequence
     (lambda ()
       (initiate-sequence
@@ -1214,6 +1215,68 @@
         #:next-pos (lambda (pos) (if pos (ordered-map-query-weak om (car pos) '>) #f))
         #:pos->element (lambda (pos) pos)
         #:continue-with-pos? (lambda (pos) (if pos #t #f))))))
+
+;; Generator-based ascending traversal (more efficient)
+(define (in-ordered-map om)
+  (in-generator
+    (define (yield-node node depth)
+      (match depth
+        [0 (yield node)]
+        [_ (match node
+          [(node:2 _ x0 x1)
+            (yield-node x0 (sub1 depth))
+            (yield-node x1 (sub1 depth))]
+          [(node:3 _ x0 x1 x2)
+            (yield-node x0 (sub1 depth))
+            (yield-node x1 (sub1 depth))
+            (yield-node x2 (sub1 depth))])]))
+    (define (yield-digit digit depth)
+      (match digit
+        [(digit:1 x0) (yield-node x0 depth)]
+        [(digit:2 x0 x1) (yield-node x0 depth) (yield-node x1 depth)]
+        [(digit:3 x0 x1 x2) (yield-node x0 depth) (yield-node x1 depth) (yield-node x2 depth)]
+        [(digit:4 x0 x1 x2 x3) (yield-node x0 depth) (yield-node x1 depth) (yield-node x2 depth) (yield-node x3 depth)]))
+    (define (yield-ft ft depth)
+      (match ft
+        [(ft:empty) (void)]
+        [(ft:single node) (yield-node node depth)]
+        [(ft:deep _ left inner right)
+          (yield-digit left depth)
+          (yield-ft inner (add1 depth))
+          (yield-digit right depth)]))
+    (match-define (ordered-map _ ft) om)
+    (yield-ft ft 0)))
+
+;; Generator-based descending traversal
+(define (in-ordered-map-reverse om)
+  (in-generator
+    (define (yield-node node depth)
+      (match depth
+        [0 (yield node)]
+        [_ (match node
+          [(node:2 _ x0 x1)
+            (yield-node x1 (sub1 depth))
+            (yield-node x0 (sub1 depth))]
+          [(node:3 _ x0 x1 x2)
+            (yield-node x2 (sub1 depth))
+            (yield-node x1 (sub1 depth))
+            (yield-node x0 (sub1 depth))])]))
+    (define (yield-digit digit depth)
+      (match digit
+        [(digit:1 x0) (yield-node x0 depth)]
+        [(digit:2 x0 x1) (yield-node x1 depth) (yield-node x0 depth)]
+        [(digit:3 x0 x1 x2) (yield-node x2 depth) (yield-node x1 depth) (yield-node x0 depth)]
+        [(digit:4 x0 x1 x2 x3) (yield-node x3 depth) (yield-node x2 depth) (yield-node x1 depth) (yield-node x0 depth)]))
+    (define (yield-ft ft depth)
+      (match ft
+        [(ft:empty) (void)]
+        [(ft:single node) (yield-node node depth)]
+        [(ft:deep _ left inner right)
+          (yield-digit right depth)
+          (yield-ft inner (add1 depth))
+          (yield-digit left depth)]))
+    (match-define (ordered-map _ ft) om)
+    (yield-ft ft 0)))
 
 ;; ========================================
 ;; Ref and Set (dict-style)
@@ -1239,7 +1302,7 @@
 (provide ordered-map-empty)
 (provide ordered-map-ref ordered-map-set)
 (provide ordered-map-count ordered-map-has-key? ordered-map-keys ordered-map-values)
-(provide in-ordered-map)
+(provide in-ordered-map in-ordered-map-reverse in-ordered-map/lazy)
 
 ;; ========================================
 ;; Weak Query Implementation
