@@ -362,6 +362,23 @@
       (graph-remove-edge g1 paired)
       g1))
 
+;; Remove the single edge between src and dst (error if 0 or >1 edges)
+(define (graph-remove-edge-between g src dst)
+  (define edges (graph-edges-between g src dst))
+  (cond
+    [(bitset-empty? edges)
+     (error 'graph-remove-edge-between "no edge from ~a to ~a" src dst)]
+    [(> (bitset-count edges) 1)
+     (error 'graph-remove-edge-between "multiple edges from ~a to ~a, use graph-remove-edges-between" src dst)]
+    [else
+     (graph-remove-edge g (edge-id (bitset-min edges)))]))
+
+;; Remove all edges from src to dst
+(define (graph-remove-edges-between g src dst)
+  (define edges (graph-edges-between g src dst))
+  (for/fold ([g g]) ([eid (in-bitset edges)])
+    (graph-remove-edge g (edge-id eid))))
+
 ;; ========================================
 ;; Adjacency Queries
 ;; ========================================
@@ -470,6 +487,7 @@
 ;; Edge operations
 (provide graph-add-edge graph-add-edge-pair)
 (provide graph-remove-edge graph-remove-edge*)
+(provide graph-remove-edge-between graph-remove-edges-between)
 (provide graph-edge? graph-edges-set graph-edge-count)
 (provide graph-edge-src graph-edge-dst graph-edge-endpoints)
 (provide graph-edge-pair)

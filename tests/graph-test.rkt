@@ -150,6 +150,43 @@
   (check-false (graph-edge? g6 e2))
   (check-false (graph-edge? g6 e3)))
 
+(test-case "graph-remove-edge-between"
+  (define-values (g1 v0) (graph-add-vertex graph-empty))
+  (define-values (g2 v1) (graph-add-vertex g1))
+  (define-values (g3 e0) (graph-add-edge g2 v0 v1))
+
+  ;; Remove single edge by vertices
+  (define g4 (graph-remove-edge-between g3 v0 v1))
+  (check-equal? (graph-edge-count g4) 0)
+  (check-false (graph-edge? g4 e0))
+
+  ;; Error: no edge
+  (check-exn exn:fail? (lambda () (graph-remove-edge-between g4 v0 v1)))
+
+  ;; Error: multiple edges
+  (define-values (g5 e1) (graph-add-edge g3 v0 v1))
+  (check-exn exn:fail? (lambda () (graph-remove-edge-between g5 v0 v1))))
+
+(test-case "graph-remove-edges-between"
+  (define-values (g1 v0) (graph-add-vertex graph-empty))
+  (define-values (g2 v1) (graph-add-vertex g1))
+  (define-values (g3 e0) (graph-add-edge g2 v0 v1))
+  (define-values (g4 e1) (graph-add-edge g3 v0 v1))
+  (define-values (g5 e2) (graph-add-edge g4 v0 v1))
+
+  (check-equal? (graph-edge-count g5) 3)
+
+  ;; Remove all edges between v0 and v1
+  (define g6 (graph-remove-edges-between g5 v0 v1))
+  (check-equal? (graph-edge-count g6) 0)
+  (check-false (graph-edge? g6 e0))
+  (check-false (graph-edge? g6 e1))
+  (check-false (graph-edge? g6 e2))
+
+  ;; Remove from empty is ok (no-op)
+  (define g7 (graph-remove-edges-between g6 v0 v1))
+  (check-equal? (graph-edge-count g7) 0))
+
 (test-case "edge-id-no-recycling"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
   (define-values (g2 v1) (graph-add-vertex g1))
