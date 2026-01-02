@@ -588,9 +588,10 @@
 
 ;; ========================================
 ;; Advanced match expander: pvector**
-;; Supports: (pvector** (pvector len x) elem1 elem2 (pvector _ y))
-;; - (pvector len-pat pv-pat): variable-length segment
-;; - other patterns: single element
+;; Supports: (pvector** (pvector n x) elem1 elem2 (pvector _ y))
+;; - (pvector _ pv-pat): REST match, takes all remaining elements (only ONE allowed)
+;; - (pvector n pv-pat): FIXED match, n is already-bound variable, takes n elements
+;; - other patterns: single element match
 ;; ========================================
 
 (require (for-syntax racket/base racket/syntax))
@@ -602,15 +603,16 @@
     [(pvector _ _) #t]
     [_ #f]))
 
+;; Helper: check if length pattern is `_` (rest match)
+(define-for-syntax (rest-match? len-stx)
+  (and (identifier? len-stx)
+       (free-identifier=? len-stx #'_)))
+
 ;; Helper: parse segments into (prefix-var? fixed-pats suffix-var?)
-;; Rules:
-;; - pvector segment at START is prefix
-;; - pvector segment at END is suffix
-;; - pvector segments in the middle are treated as fixed (error or fallback)
 (define-for-syntax (parse-pvector**-segments segs)
   (define seg-list (syntax->list segs))
   (when (null? seg-list)
-    (error 'pvector** "empty pattern"))
+    (raise-syntax-error 'pvector** "empty pattern" segs))
 
   ;; Check if first segment is pvector (prefix)
   (define-values (prefix-var rest-segs)
@@ -625,7 +627,23 @@
         (values (last rest-segs) (drop-right rest-segs 1))
         (values #f rest-segs)))
 
-  ;; Middle segments are fixed element patterns
+  ;; Check for multiple rest matches
+  (define prefix-is-rest?
+    (and prefix-var
+         (syntax-case prefix-var (pvector)
+           [(pvector len _) (rest-match? #'len)]
+           [_ #f])))
+  (define suffix-is-rest?
+    (and suffix-var
+         (syntax-case suffix-var (pvector)
+           [(pvector len _) (rest-match? #'len)]
+           [_ #f])))
+
+  (when (and prefix-is-rest? suffix-is-rest?)
+    (raise-syntax-error 'pvector**
+      "cannot have two rest matches (pvector _ ...); only one allowed"
+      segs))
+
   (values prefix-var middle-segs suffix-var))
 
 ;; Generate the match code
@@ -634,8 +652,7 @@
     (parse-pvector**-segments segments))
   (define fixed-count (length fixed-pats))
 
-  (with-syntax ([input input-stx]
-                [fixed-n fixed-count])
+  (with-syntax ([fixed-n fixed-count])
     (cond
       ;; No variable segments - just match fixed elements
       [(and (not prefix-var) (not suffix-var))
@@ -649,32 +666,54 @@
        (syntax-case prefix-var (pvector)
          [(pvector len-pat pv-pat)
           (with-syntax ([(fixed-pat ...) fixed-pats])
-            #'(? pvector?
-                 (app (lambda (pv)
-                        (define len (pvector-length pv))
-                        (define prefix-len (- len fixed-n))
-                        (if (>= prefix-len 0)
-                            (list prefix-len
-                                  (pvector-take pv prefix-len)
-                                  (pvector->list (pvector-drop pv prefix-len)))
-                            #f))
-                      (list len-pat pv-pat (list fixed-pat ...)))))])]
+            (if (rest-match? #'len-pat)
+                ;; REST match: prefix takes all remaining after fixed
+                #'(? pvector?
+                     (app (lambda (pv)
+                            (define len (pvector-length pv))
+                            (define prefix-len (- len fixed-n))
+                            (if (>= prefix-len 0)
+                                (list (pvector-take pv prefix-len)
+                                      (pvector->list (pvector-drop pv prefix-len)))
+                                #f))
+                          (list pv-pat (list fixed-pat ...))))
+                ;; FIXED match: prefix takes exactly len-pat elements
+                #'(? pvector?
+                     (app (lambda (pv)
+                            (define len (pvector-length pv))
+                            (if (and (>= len-pat 0)
+                                     (= len (+ len-pat fixed-n)))
+                                (list (pvector-take pv len-pat)
+                                      (pvector->list (pvector-drop pv len-pat)))
+                                #f))
+                          (list pv-pat (list fixed-pat ...))))))])]
 
       ;; Only suffix variable segment
       [(and (not prefix-var) suffix-var)
        (syntax-case suffix-var (pvector)
          [(pvector len-pat pv-pat)
           (with-syntax ([(fixed-pat ...) fixed-pats])
-            #'(? pvector?
-                 (app (lambda (pv)
-                        (define len (pvector-length pv))
-                        (define suffix-len (- len fixed-n))
-                        (if (>= suffix-len 0)
-                            (list (pvector->list (pvector-take pv fixed-n))
-                                  suffix-len
-                                  (pvector-drop pv fixed-n))
-                            #f))
-                      (list (list fixed-pat ...) len-pat pv-pat))))])]
+            (if (rest-match? #'len-pat)
+                ;; REST match: suffix takes all remaining after fixed
+                #'(? pvector?
+                     (app (lambda (pv)
+                            (define len (pvector-length pv))
+                            (define suffix-len (- len fixed-n))
+                            (if (>= suffix-len 0)
+                                (list (pvector->list (pvector-take pv fixed-n))
+                                      (pvector-drop pv fixed-n))
+                                #f))
+                          (list (list fixed-pat ...) pv-pat)))
+                ;; FIXED match: suffix takes exactly len-pat elements
+                #'(? pvector?
+                     (app (lambda (pv)
+                            (define len (pvector-length pv))
+                            (if (and (>= len-pat 0)
+                                     (= len (+ fixed-n len-pat)))
+                                (list (pvector->list (pvector-take pv fixed-n))
+                                      (pvector-drop pv fixed-n))
+                                #f))
+                          (list (list fixed-pat ...) pv-pat)))))])]
 
       ;; Both prefix and suffix variable segments
       [else
@@ -683,54 +722,42 @@
           (syntax-case suffix-var (pvector)
             [(pvector suffix-len-pat suffix-pv-pat)
              (with-syntax ([(fixed-pat ...) fixed-pats])
-               ;; Check if suffix-len is '_' (greedy suffix takes all remaining)
-               (if (and (identifier? #'suffix-len-pat)
-                        (free-identifier=? #'suffix-len-pat #'_))
-                   ;; Suffix is greedy - prefix gets 0, suffix gets rest
-                   #'(? pvector?
-                        (app (lambda (pv)
-                               (define len (pvector-length pv))
-                               (define suffix-len (- len fixed-n))
-                               (if (>= suffix-len 0)
-                                   (list 0
-                                         (pvector-empty)
-                                         (pvector->list (pvector-take pv fixed-n))
-                                         suffix-len
-                                         (pvector-drop pv fixed-n))
-                                   #f))
-                             (list prefix-len-pat prefix-pv-pat
-                                   (list fixed-pat ...)
-                                   suffix-len-pat suffix-pv-pat)))
-                   ;; Check if prefix-len is '_' (greedy prefix takes all remaining)
-                   (if (and (identifier? #'prefix-len-pat)
-                            (free-identifier=? #'prefix-len-pat #'_))
-                       ;; Prefix is greedy - suffix gets 0, prefix gets rest
-                       #'(? pvector?
-                            (app (lambda (pv)
-                                   (define len (pvector-length pv))
-                                   (define prefix-len (- len fixed-n))
-                                   (if (>= prefix-len 0)
-                                       (list prefix-len
-                                             (pvector-take pv prefix-len)
-                                             (pvector->list (pvector-drop pv prefix-len))
-                                             0
-                                             (pvector-empty))
-                                       #f))
-                                 (list prefix-len-pat prefix-pv-pat
-                                       (list fixed-pat ...)
-                                       suffix-len-pat suffix-pv-pat)))
-                       ;; Neither is '_' - both get 0, all goes to fixed
-                       #'(? pvector?
-                            (app (lambda (pv)
-                                   (define len (pvector-length pv))
-                                   (if (= len fixed-n)
-                                       (list 0 (pvector-empty)
-                                             (pvector->list pv)
-                                             0 (pvector-empty))
-                                       #f))
-                                 (list prefix-len-pat prefix-pv-pat
-                                       (list fixed-pat ...)
-                                       suffix-len-pat suffix-pv-pat))))))])])])))
+               (cond
+                 ;; Suffix is REST, prefix is FIXED
+                 [(rest-match? #'suffix-len-pat)
+                  #'(? pvector?
+                       (app (lambda (pv)
+                              (define len (pvector-length pv))
+                              (define suffix-len (- len fixed-n prefix-len-pat))
+                              (if (and (>= prefix-len-pat 0) (>= suffix-len 0))
+                                  (list (pvector-take pv prefix-len-pat)
+                                        (pvector->list (pvector-copy pv prefix-len-pat (+ prefix-len-pat fixed-n)))
+                                        (pvector-drop pv (+ prefix-len-pat fixed-n)))
+                                  #f))
+                            (list prefix-pv-pat (list fixed-pat ...) suffix-pv-pat)))]
+                 ;; Prefix is REST, suffix is FIXED
+                 [(rest-match? #'prefix-len-pat)
+                  #'(? pvector?
+                       (app (lambda (pv)
+                              (define len (pvector-length pv))
+                              (define prefix-len (- len fixed-n suffix-len-pat))
+                              (if (and (>= suffix-len-pat 0) (>= prefix-len 0))
+                                  (list (pvector-take pv prefix-len)
+                                        (pvector->list (pvector-copy pv prefix-len (+ prefix-len fixed-n)))
+                                        (pvector-drop pv (+ prefix-len fixed-n)))
+                                  #f))
+                            (list prefix-pv-pat (list fixed-pat ...) suffix-pv-pat)))]
+                 ;; Both are FIXED
+                 [else
+                  #'(? pvector?
+                       (app (lambda (pv)
+                              (define len (pvector-length pv))
+                              (if (= len (+ prefix-len-pat fixed-n suffix-len-pat))
+                                  (list (pvector-take pv prefix-len-pat)
+                                        (pvector->list (pvector-copy pv prefix-len-pat (+ prefix-len-pat fixed-n)))
+                                        (pvector-drop pv (+ prefix-len-pat fixed-n)))
+                                  #f))
+                            (list prefix-pv-pat (list fixed-pat ...) suffix-pv-pat)))]))])])])))
 
 (define-match-expander pvector**
   (lambda (stx)
