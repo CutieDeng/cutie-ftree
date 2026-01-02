@@ -253,8 +253,12 @@
 )
 
 ;; Comprehensions (syntax, no contracts needed)
-(require (only-in "../pvector.rkt" for/pvector for*/pvector pvector pvector*))
+(require (only-in "../pvector.rkt" for/pvector for*/pvector pvector pvector*
+                  pvector-ref/fast pvector-set/fast))
 (provide for/pvector for*/pvector)
+
+;; Fast (zero-allocation) operations - direct exports
+(provide pvector-ref/fast pvector-set/fast)
 
 ;; Match expanders (syntax)
 (provide pvector pvector*)
@@ -262,10 +266,10 @@
 ;; Parameterized contracts
 (provide pvectorof contracted-pvector?)
 
-;; Contracted operations (work with both pvector and contracted-pvector)
+;; Contract-aware operations as *-suffixed (explicit)
 (provide
   (rename-out
-    [cpv? pvector?*]           ;; accepts both types
+    [cpv? pvector?*]
     [cpv-ref pvector-ref*]
     [cpv-set pvector-set*]
     [cpv-cons-left pvector-cons-left*]
@@ -281,3 +285,29 @@
     [cpv-take pvector-take*]
     [cpv-drop pvector-drop*]
     [cpv-append pvector-append*]))
+
+;; ========================================
+;; Unified API: same names, contract-aware
+;; Use: (require (prefix-in safe: "pvector/safe.rkt"))
+;;      or override originals with:
+;;      (require (except-in "pvector.rkt" pvector-ref ...)
+;;               (rename-in "pvector/safe.rkt" ...))
+;; ========================================
+(provide
+  (rename-out
+    ;; These work transparently with both pvector and contracted-pvector
+    [cpv-ref safe:pvector-ref]
+    [cpv-set safe:pvector-set]
+    [cpv-cons-left safe:pvector-cons-left]
+    [cpv-cons-right safe:pvector-cons-right]
+    [cpv-pop-left safe:pvector-pop-left]
+    [cpv-pop-right safe:pvector-pop-right]
+    [cpv-view-left safe:pvector-view-left]
+    [cpv-view-right safe:pvector-view-right]
+    [cpv-insert safe:pvector-insert]
+    [cpv-delete safe:pvector-delete]
+    [cpv-length safe:pvector-length]
+    [cpv-empty? safe:pvector-empty?]
+    [cpv-take safe:pvector-take]
+    [cpv-drop safe:pvector-drop]
+    [cpv-append safe:pvector-append]))

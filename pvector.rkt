@@ -2,6 +2,10 @@
 
 (require racket/match racket/contract racket/sequence)
 (require "private/core.rkt" "private/core-algorithm.rkt")
+;; Import new zero-allocation digit API
+(require (only-in "private/core-algorithm.rkt"
+  digit-find-by-measure digit-update-by-measure
+  node-find-by-measure node-update-by-measure))
 
 (define core/size (ft:config (lambda () 0) (lambda (_) 1) +))
 
@@ -96,7 +100,7 @@
 
 (define (pvector-set:impl pv idx value depth)
   (match pv
-    [(ft:single r) (pvector-set-node:impl r idx value depth)]
+    [(ft:single r) (ft:single (pvector-set-node:impl r idx value depth))]
     [(ft:deep old lhs inner rhs)
       (define lhs-measure (measure:digit core/size lhs depth))
       (define inner-measure (+ lhs-measure (measure:ft core/size inner (add1 depth))))
@@ -580,6 +584,84 @@
       [(_ pat ... . rest-pat)
         #'(? pvector? (app pvector->list (list-rest pat ... rest-pat)))])))
 
+;; ========================================
+;; Optimized ref/set using zero-allocation digit API
+;; ========================================
+
+;; Create measure function for current depth
+(define (make-measure-fn depth)
+  (lambda (node) (measure:node core/size node depth)))
+
+;; Fast ref: uses digit-find-by-measure instead of digit-add-list
+(define (pvector-ref-node/fast node idx depth)
+  (match depth
+    [0 node]
+    [_ (define measure-fn (make-measure-fn (sub1 depth)))
+      (define-values (idx^ child) (node-find-by-measure node idx measure-fn))
+      (pvector-ref-node/fast child idx^ (sub1 depth))]))
+
+(define (pvector-ref-digit/fast digit idx depth)
+  (define measure-fn (make-measure-fn depth))
+  (define-values (idx^ node) (digit-find-by-measure digit idx measure-fn))
+  (pvector-ref-node/fast node idx^ depth))
+
+(define (pvector-ref/fast:impl pv idx depth)
+  (match pv
+    [(ft:single r) (pvector-ref-node/fast r idx depth)]
+    [(ft:deep _ lhs inner rhs)
+      (define lhs-measure (measure:digit core/size lhs depth))
+      (define inner-measure (+ lhs-measure (measure:ft core/size inner (add1 depth))))
+      (cond
+        [(< idx lhs-measure) (pvector-ref-digit/fast lhs idx depth)]
+        [(< idx inner-measure) (pvector-ref/fast:impl inner (- idx lhs-measure) (add1 depth))]
+        [else (pvector-ref-digit/fast rhs (- idx inner-measure) depth)])]))
+
+(define (pvector-ref/fast pv idx)
+  (cond
+    [(< idx 0) (error 'pvector-ref/fast "index out of bounds: ~a" idx)]
+    [(>= idx (measure:ft core/size pv 0)) (error 'pvector-ref/fast "index out of bounds: ~a" idx)]
+    [else (pvector-ref/fast:impl pv idx 0)]))
+
+;; Fast set: uses digit-update-by-measure instead of digit-add-list
+(define (pvector-set-node/fast node idx value depth)
+  (match depth
+    [0 value]
+    [_ (define measure-fn (make-measure-fn (sub1 depth)))
+      (define (update-fn child child-idx)
+        (pvector-set-node/fast child child-idx value (sub1 depth)))
+      (define (rebuild-fn . children)
+        (match children
+          [(list a b) (build-node2 core/size a b (sub1 depth))]
+          [(list a b c) (build-node3 core/size a b c (sub1 depth))]))
+      (node-update-by-measure node idx measure-fn update-fn rebuild-fn)]))
+
+(define (pvector-set-digit/fast digit idx value depth)
+  (define measure-fn (make-measure-fn depth))
+  (define (update-fn node node-idx)
+    (pvector-set-node/fast node node-idx value depth))
+  (digit-update-by-measure digit idx measure-fn update-fn))
+
+(define (pvector-set/fast:impl pv idx value depth)
+  (match pv
+    [(ft:single r) (ft:single (pvector-set-node/fast r idx value depth))]
+    [(ft:deep v lhs inner rhs)
+      (define lhs-measure (measure:digit core/size lhs depth))
+      (define inner-measure (+ lhs-measure (measure:ft core/size inner (add1 depth))))
+      (cond
+        [(< idx lhs-measure)
+          (ft:deep v (pvector-set-digit/fast lhs idx value depth) inner rhs)]
+        [(< idx inner-measure)
+          (ft:deep v lhs (pvector-set/fast:impl inner (- idx lhs-measure) value (add1 depth)) rhs)]
+        [(< idx v)
+          (ft:deep v lhs inner (pvector-set-digit/fast rhs (- idx inner-measure) value depth))]
+        [else (error 'pvector-set/fast "index out of bounds")])]))
+
+(define (pvector-set/fast pv idx val)
+  (cond
+    [(< idx 0) (error 'pvector-set/fast "index out of bounds: ~a" idx)]
+    [(>= idx (measure:ft core/size pv 0)) (error 'pvector-set/fast "index out of bounds: ~a" idx)]
+    [else (pvector-set/fast:impl pv idx val 0)]))
+
 ;; Exports
 (provide pvector-delete)
 (provide pvector? pvector-empty?)
@@ -596,3 +678,5 @@
 (provide for/pvector for*/pvector)
 ;; Match expanders
 (provide pvector pvector*)
+;; Fast (zero-allocation) API
+(provide pvector-ref/fast pvector-set/fast)

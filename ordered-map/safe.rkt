@@ -200,7 +200,7 @@
 ;; Parameterized contracts
 (provide ordered-mapof contracted-ordered-map?)
 
-;; Contracted operations (work with both ordered-map and contracted-ordered-map)
+;; Contract-aware operations as *-suffixed (explicit)
 (provide
   (rename-out
     [com? ordered-map?*]
@@ -215,3 +215,20 @@
     [com-count ordered-map-count*]
     [com-empty? ordered-map-empty?*]
     [com-has-key? ordered-map-has-key?*]))
+
+;; ========================================
+;; Unified API: same names, contract-aware
+;; ========================================
+(provide
+  (rename-out
+    [com-ref safe:ordered-map-ref]
+    [com-set safe:ordered-map-set]
+    [com-insert safe:ordered-map-insert]
+    [com-delete safe:ordered-map-delete]
+    [com-query safe:ordered-map-query]
+    [com-query-weak safe:ordered-map-query-weak]
+    [com-min safe:ordered-map-min]
+    [com-max safe:ordered-map-max]
+    [com-count safe:ordered-map-count]
+    [com-empty? safe:ordered-map-empty?]
+    [com-has-key? safe:ordered-map-has-key?]))

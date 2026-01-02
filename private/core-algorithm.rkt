@@ -357,6 +357,154 @@
   (node:2 c x0 x1)
 )
 
+;; ========================================
+;; Zero-allocation digit iteration API
+;; ========================================
+
+;; digit-fold-left: fold over digit elements left-to-right
+;; (digit-fold-left digit init (lambda (acc elem) ...)) -> acc
+(define (digit-fold-left digit init f)
+  (match digit
+    [(digit:1 a) (f init a)]
+    [(digit:2 a b) (f (f init a) b)]
+    [(digit:3 a b c) (f (f (f init a) b) c)]
+    [(digit:4 a b c d) (f (f (f (f init a) b) c) d)]))
+
+;; digit-fold-right: fold over digit elements right-to-left
+;; (digit-fold-right digit init (lambda (elem acc) ...)) -> acc
+(define (digit-fold-right digit init f)
+  (match digit
+    [(digit:1 a) (f a init)]
+    [(digit:2 a b) (f a (f b init))]
+    [(digit:3 a b c) (f a (f b (f c init)))]
+    [(digit:4 a b c d) (f a (f b (f c (f d init))))]))
+
+;; digit-for-each: iterate over digit elements (for side effects)
+(define (digit-for-each digit f)
+  (match digit
+    [(digit:1 a) (f a)]
+    [(digit:2 a b) (f a) (f b)]
+    [(digit:3 a b c) (f a) (f b) (f c)]
+    [(digit:4 a b c d) (f a) (f b) (f c) (f d)]))
+
+;; digit-find-by-measure: find element where accumulated measure exceeds target
+;; Returns (values remaining-idx found-element)
+;; measure-fn: node -> integer (size/measure of node)
+(define (digit-find-by-measure digit idx measure-fn)
+  (match digit
+    [(digit:1 a)
+      (values idx a)]
+    [(digit:2 a b)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (values idx a)
+        (values (- idx a-sz) b))]
+    [(digit:3 a b c)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (values idx a)
+        (let ([idx (- idx a-sz)])
+          (define b-sz (measure-fn b))
+          (if (< idx b-sz)
+            (values idx b)
+            (values (- idx b-sz) c))))]
+    [(digit:4 a b c d)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (values idx a)
+        (let ([idx (- idx a-sz)])
+          (define b-sz (measure-fn b))
+          (if (< idx b-sz)
+            (values idx b)
+            (let ([idx (- idx b-sz)])
+              (define c-sz (measure-fn c))
+              (if (< idx c-sz)
+                (values idx c)
+                (values (- idx c-sz) d))))))]))
+
+;; digit-update-by-measure: update element at accumulated measure position
+;; Returns new digit with updated element
+;; update-fn: (node remaining-idx) -> new-node
+(define (digit-update-by-measure digit idx measure-fn update-fn)
+  (match digit
+    [(digit:1 a)
+      (digit:1 (update-fn a idx))]
+    [(digit:2 a b)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (digit:2 (update-fn a idx) b)
+        (digit:2 a (update-fn b (- idx a-sz))))]
+    [(digit:3 a b c)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (digit:3 (update-fn a idx) b c)
+        (let ([idx (- idx a-sz)])
+          (define b-sz (measure-fn b))
+          (if (< idx b-sz)
+            (digit:3 a (update-fn b idx) c)
+            (digit:3 a b (update-fn c (- idx b-sz))))))]
+    [(digit:4 a b c d)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (digit:4 (update-fn a idx) b c d)
+        (let ([idx (- idx a-sz)])
+          (define b-sz (measure-fn b))
+          (if (< idx b-sz)
+            (digit:4 a (update-fn b idx) c d)
+            (let ([idx (- idx b-sz)])
+              (define c-sz (measure-fn c))
+              (if (< idx c-sz)
+                (digit:4 a b (update-fn c idx) d)
+                (digit:4 a b c (update-fn d (- idx c-sz))))))))]))
+
+;; node-fold-left: fold over node children left-to-right
+(define (node-fold-left node init f)
+  (match node
+    [(node:2 _ a b) (f (f init a) b)]
+    [(node:3 _ a b c) (f (f (f init a) b) c)]))
+
+;; node-fold-right: fold over node children right-to-left
+(define (node-fold-right node init f)
+  (match node
+    [(node:2 _ a b) (f a (f b init))]
+    [(node:3 _ a b c) (f a (f b (f c init)))]))
+
+;; node-find-by-measure: find child in node by accumulated measure
+(define (node-find-by-measure node idx measure-fn)
+  (match node
+    [(node:2 _ a b)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (values idx a)
+        (values (- idx a-sz) b))]
+    [(node:3 _ a b c)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (values idx a)
+        (let ([idx (- idx a-sz)])
+          (define b-sz (measure-fn b))
+          (if (< idx b-sz)
+            (values idx b)
+            (values (- idx b-sz) c))))]))
+
+;; node-update-by-measure: update child in node by accumulated measure
+(define (node-update-by-measure node idx measure-fn update-fn rebuild-fn)
+  (match node
+    [(node:2 _ a b)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (rebuild-fn (update-fn a idx) b)
+        (rebuild-fn a (update-fn b (- idx a-sz))))]
+    [(node:3 _ a b c)
+      (define a-sz (measure-fn a))
+      (if (< idx a-sz)
+        (rebuild-fn (update-fn a idx) b c)
+        (let ([idx (- idx a-sz)])
+          (define b-sz (measure-fn b))
+          (if (< idx b-sz)
+            (rebuild-fn a (update-fn b idx) c)
+            (rebuild-fn a b (update-fn c (- idx b-sz))))))]))
+
 (provide measure:node measure:ft measure:digit)
 (provide consL:impl consR:impl hdL:impl hdR:impl concat:impl)
 (provide digit-add-list digit->list)
@@ -364,3 +512,9 @@
 (provide build-node2 build-node3)
 (provide build-digit-from-list list->digit)
 (provide build-ft0)
+
+;; New zero-allocation API
+(provide digit-fold-left digit-fold-right digit-for-each)
+(provide digit-find-by-measure digit-update-by-measure)
+(provide node-fold-left node-fold-right)
+(provide node-find-by-measure node-update-by-measure)
