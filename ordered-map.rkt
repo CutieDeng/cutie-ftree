@@ -1163,6 +1163,28 @@
 (define (ordered-map-empty cmp-fn)
   (ordered-map cmp-fn (ft:empty)))
 
+;; ----------------------------------------
+;; Quick initialization (like hash)
+;; ----------------------------------------
+;; (make-ordered-map cmp-fn k1 v1 k2 v2 ...)
+
+(define (make-ordered-map cmp-fn . kvs)
+  (let loop ([kvs kvs] [om (ordered-map-empty cmp-fn)])
+    (match kvs
+      ['() om]
+      [(list k v rest ...)
+       (loop rest (ordered-map-set om k v))]
+      [_ (error 'make-ordered-map "expected even number of key-value arguments")])))
+
+;; Macro version for compile-time checking
+(require (for-syntax racket/base))
+(define-syntax (ordered-map: stx)
+  (syntax-case stx ()
+    [(_ cmp-fn)
+     #'(ordered-map-empty cmp-fn)]
+    [(_ cmp-fn k v rest ...)
+     #'(ordered-map-set (ordered-map: cmp-fn rest ...) k v)]))
+
 ;; ========================================
 ;; Additional gen:dict methods
 ;; ========================================
@@ -1324,12 +1346,62 @@
     (syntax-case stx ()
       [(_) #'(? ordered-map-empty?)])))
 
-;; Match and extract entries as list: (ordered-map-pairs cmp-pat pairs-pat)
+;; Match and extract entries as list: (ordered-map-pairs pairs-pat)
 (define-match-expander ordered-map-pairs
   (lambda (stx)
     (syntax-case stx ()
       [(_ pairs-pat)
         #'(? ordered-map? (app (lambda (om) (for/list ([kv (in-ordered-map om)]) kv)) pairs-pat))])))
+
+;; ----------------------------------------
+;; Key-based extraction pattern
+;; ----------------------------------------
+;; (ordered-map* [key-expr val-pat] ...)           - all keys must exist
+;; (ordered-map* [key-expr val-pat default] ...)   - use default if missing
+;; Can mix both forms in one pattern
+
+(require (for-syntax racket/list))
+
+(define-for-syntax (parse-binding stx binding)
+  ;; Returns: (values key-expr val-pat has-default? default-expr)
+  (syntax-case binding ()
+    [[key-expr val-pat default-expr]
+     (values #'key-expr #'val-pat #t #'default-expr)]
+    [[key-expr val-pat]
+     (values #'key-expr #'val-pat #f #f)]
+    [_ (raise-syntax-error 'ordered-map*
+         "expected [key val-pat] or [key val-pat default]" stx binding)]))
+
+(define-for-syntax (build-query-expr key has-default? default-expr)
+  (if has-default?
+      #`(match (ordered-map-query om #,key)
+          [#f #,default-expr]
+          [(cons _ v) v])
+      #`(ordered-map-query om #,key)))
+
+(define-for-syntax (build-pat-expr pat has-default?)
+  (if has-default?
+      pat
+      #`(cons _ #,pat)))
+
+(define-match-expander ordered-map*
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_ binding ...)
+       (let ()
+         (define bindings (syntax->list #'(binding ...)))
+         (define parsed (for/list ([b bindings])
+                          (define-values (k p h? d) (parse-binding stx b))
+                          (list k p h? d)))
+         (with-syntax ([(query-expr ...)
+                        (for/list ([p parsed])
+                          (build-query-expr (first p) (third p) (fourth p)))]
+                       [(pat-expr ...)
+                        (for/list ([p parsed])
+                          (build-pat-expr (second p) (third p)))])
+           #'(? ordered-map?
+               (app (lambda (om) (list query-expr ...))
+                 (list pat-expr ...)))))])))
 
 ;; ========================================
 ;; Ref and Set (dict-style)
@@ -1352,7 +1424,7 @@
 (provide ordered-map-empty? ordered-map-min ordered-map-max)
 (provide ordered-map-query ordered-map-query-weak)
 (provide ordered-map-delete ordered-map-insert)
-(provide ordered-map-empty)
+(provide ordered-map-empty make-ordered-map ordered-map:)
 (provide ordered-map-ref ordered-map-set)
 (provide ordered-map-count ordered-map-has-key? ordered-map-keys ordered-map-values)
 (provide in-ordered-map in-ordered-map-reverse in-ordered-map/lazy)
@@ -1361,6 +1433,7 @@
 (provide for/ordered-map for*/ordered-map)
 ;; Match expanders
 (provide ordered-map-empty-pat ordered-map-pairs)
+(provide ordered-map*)
 
 ;; ========================================
 ;; Weak Query Implementation
