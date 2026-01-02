@@ -253,15 +253,15 @@
 )
 
 ;; Comprehensions (syntax, no contracts needed)
-(require (only-in "../pvector.rkt" for/pvector for*/pvector pvector pvector*
+(require (only-in "../pvector.rkt" for/pvector for*/pvector pvector pvector* pvector**
                   pvector-ref/fast pvector-set/fast))
 (provide for/pvector for*/pvector)
 
-;; Fast (zero-allocation) operations - direct exports
+;; Backwards compatibility aliases (now same as default)
 (provide pvector-ref/fast pvector-set/fast)
 
 ;; Match expanders (syntax)
-(provide pvector pvector*)
+(provide pvector pvector* pvector**)
 
 ;; Parameterized contracts
 (provide pvectorof contracted-pvector?)

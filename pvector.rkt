@@ -2,7 +2,7 @@
 
 (require racket/match racket/contract racket/sequence)
 (require "private/core.rkt" "private/core-algorithm.rkt")
-;; Import new zero-allocation digit API
+;; Zero-allocation digit API
 (require (only-in "private/core-algorithm.rkt"
   digit-find-by-measure digit-update-by-measure
   node-find-by-measure node-update-by-measure))
@@ -30,26 +30,29 @@
 (define pvector-empty:impl (ft:empty))
 (define (pvector-empty) pvector-empty:impl)
 
-(define (find-in-list lst idx depth)
-  (match-define (cons head lst^) lst)
-  (define sz (measure:node core/size head depth))
-  (cond [(>= idx sz) (find-in-list lst^ (- idx sz) depth)]
-    [else (pvector-ref-node:impl head idx depth)]))
-
+;; Helper for node->digit conversion (used in split operations)
 (define node->list (match-lambda
   [(node:2 _ a b) `(,a ,b)]
   [(node:3 _ a b c) `(,a ,b ,c)]))
 
+;; ========================================
+;; Zero-allocation ref implementation (default)
+;; ========================================
+
+(define (make-measure-fn depth)
+  (lambda (node) (measure:node core/size node depth)))
+
 (define (pvector-ref-node:impl node idx depth)
   (match depth
-    [0 (=> e) (when (zero? idx) (e)) (assert-unreachable)]
     [0 node]
-    [_ (define lst (node->list node))
-      (find-in-list lst idx (sub1 depth))]))
+    [_ (define measure-fn (make-measure-fn (sub1 depth)))
+      (define-values (idx^ child) (node-find-by-measure node idx measure-fn))
+      (pvector-ref-node:impl child idx^ (sub1 depth))]))
 
 (define (pvector-ref-digit:impl digit idx depth)
-  (define lst (digit-add-list digit '()))
-  (find-in-list lst idx depth))
+  (define measure-fn (make-measure-fn depth))
+  (define-values (idx^ node) (digit-find-by-measure digit idx measure-fn))
+  (pvector-ref-node:impl node idx^ depth))
 
 (define (pvector-ref:impl pv idx depth)
   (match pv
@@ -64,57 +67,56 @@
 
 (define (pvector-ref pv idx)
   (cond
-    [(< idx 0) (assert-unreachable)]
-    [(>= idx (measure:ft core/size pv 0)) (assert-unreachable)]
+    [(< idx 0) (error 'pvector-ref "index out of bounds: ~a" idx)]
+    [(>= idx (measure:ft core/size pv 0)) (error 'pvector-ref "index out of bounds: ~a" idx)]
     [else (pvector-ref:impl pv idx 0)]))
 
-(define (update-in-list:impl lst idx value depth rest)
-  (match-define (cons head lst^) lst)
-  (define sz (measure:node core/size head depth))
-  (cond [(>= idx sz) (update-in-list:impl lst^ (- idx sz) value depth (cons head rest))]
-    [else (for/fold ([init (cons (pvector-set-node:impl head idx value depth) rest)]) ([r lst^])
-      (cons r init))]))
-
-(define (update-in-list lst idx value depth)
-  (reverse (update-in-list:impl lst idx value depth '())))
-
-(define (list->node lst depth)
-  (match lst
-    [`(,a ,b) (node:2 (+ (measure:node core/size a depth) (measure:node core/size b depth)) a b)]
-    [`(,a ,b ,c) (node:3
-      (+ (measure:node core/size a depth)
-        (measure:node core/size b depth) (measure:node core/size c depth))
-      a b c)]))
+;; ========================================
+;; Zero-allocation set implementation (default)
+;; ========================================
 
 (define (pvector-set-node:impl node idx value depth)
   (match depth
-    [0 (=> e) (when (zero? idx) (e)) (assert-unreachable)]
     [0 value]
-    [_ (define lst (node->list node))
-      (list->node (update-in-list lst idx value (sub1 depth)) (sub1 depth))]))
+    [_ (define measure-fn (make-measure-fn (sub1 depth)))
+      (define (update-fn child child-idx)
+        (pvector-set-node:impl child child-idx value (sub1 depth)))
+      (define (rebuild-fn . children)
+        (match children
+          [(list a b) (build-node2 core/size a b (sub1 depth))]
+          [(list a b c) (build-node3 core/size a b c (sub1 depth))]))
+      (node-update-by-measure node idx measure-fn update-fn rebuild-fn)]))
 
 (define (pvector-set-digit:impl digit idx value depth)
-  (define lst (digit-add-list digit '()))
-  (define m (update-in-list lst idx value depth))
-  (list->digit m depth))
+  (define measure-fn (make-measure-fn depth))
+  (define (update-fn node node-idx)
+    (pvector-set-node:impl node node-idx value depth))
+  (digit-update-by-measure digit idx measure-fn update-fn))
 
 (define (pvector-set:impl pv idx value depth)
   (match pv
     [(ft:single r) (ft:single (pvector-set-node:impl r idx value depth))]
-    [(ft:deep old lhs inner rhs)
+    [(ft:deep v lhs inner rhs)
       (define lhs-measure (measure:digit core/size lhs depth))
       (define inner-measure (+ lhs-measure (measure:ft core/size inner (add1 depth))))
       (cond
-        [(< idx lhs-measure) (ft:deep old (pvector-set-digit:impl lhs idx value depth) inner rhs)]
-        [(< idx inner-measure) (ft:deep old lhs (pvector-set:impl inner (- idx lhs-measure) value (add1 depth)) rhs)]
-        [(< idx old) (ft:deep old lhs inner (pvector-set-digit:impl rhs (- idx inner-measure) value depth))]
-        [else (assert-unreachable)])]))
+        [(< idx lhs-measure)
+          (ft:deep v (pvector-set-digit:impl lhs idx value depth) inner rhs)]
+        [(< idx inner-measure)
+          (ft:deep v lhs (pvector-set:impl inner (- idx lhs-measure) value (add1 depth)) rhs)]
+        [(< idx v)
+          (ft:deep v lhs inner (pvector-set-digit:impl rhs (- idx inner-measure) value depth))]
+        [else (error 'pvector-set "index out of bounds")])]))
 
 (define (pvector-set pv idx val)
   (cond
-    [(< idx 0) (assert-unreachable)]
-    [(>= idx (measure:ft core/size pv 0)) (assert-unreachable)]
+    [(< idx 0) (error 'pvector-set "index out of bounds: ~a" idx)]
+    [(>= idx (measure:ft core/size pv 0)) (error 'pvector-set "index out of bounds: ~a" idx)]
     [else (pvector-set:impl pv idx val 0)]))
+
+;; Backwards compatibility aliases
+(define pvector-ref/fast pvector-ref)
+(define pvector-set/fast pvector-set)
 
 ;; Original index-based implementation (O(n log n) total)
 (define (in-pvector/index pv)
@@ -585,82 +587,156 @@
         #'(? pvector? (app pvector->list (list-rest pat ... rest-pat)))])))
 
 ;; ========================================
-;; Optimized ref/set using zero-allocation digit API
+;; Advanced match expander: pvector**
+;; Supports: (pvector** (pvector len x) elem1 elem2 (pvector _ y))
+;; - (pvector len-pat pv-pat): variable-length segment
+;; - other patterns: single element
 ;; ========================================
 
-;; Create measure function for current depth
-(define (make-measure-fn depth)
-  (lambda (node) (measure:node core/size node depth)))
+(require (for-syntax racket/base racket/syntax))
+(require (for-syntax (only-in racket/list last drop-right)))
 
-;; Fast ref: uses digit-find-by-measure instead of digit-add-list
-(define (pvector-ref-node/fast node idx depth)
-  (match depth
-    [0 node]
-    [_ (define measure-fn (make-measure-fn (sub1 depth)))
-      (define-values (idx^ child) (node-find-by-measure node idx measure-fn))
-      (pvector-ref-node/fast child idx^ (sub1 depth))]))
+;; Helper: check if a syntax is a pvector segment pattern
+(define-for-syntax (pvector-segment? stx)
+  (syntax-case stx (pvector)
+    [(pvector _ _) #t]
+    [_ #f]))
 
-(define (pvector-ref-digit/fast digit idx depth)
-  (define measure-fn (make-measure-fn depth))
-  (define-values (idx^ node) (digit-find-by-measure digit idx measure-fn))
-  (pvector-ref-node/fast node idx^ depth))
+;; Helper: parse segments into (prefix-var? fixed-pats suffix-var?)
+;; Rules:
+;; - pvector segment at START is prefix
+;; - pvector segment at END is suffix
+;; - pvector segments in the middle are treated as fixed (error or fallback)
+(define-for-syntax (parse-pvector**-segments segs)
+  (define seg-list (syntax->list segs))
+  (when (null? seg-list)
+    (error 'pvector** "empty pattern"))
 
-(define (pvector-ref/fast:impl pv idx depth)
-  (match pv
-    [(ft:single r) (pvector-ref-node/fast r idx depth)]
-    [(ft:deep _ lhs inner rhs)
-      (define lhs-measure (measure:digit core/size lhs depth))
-      (define inner-measure (+ lhs-measure (measure:ft core/size inner (add1 depth))))
-      (cond
-        [(< idx lhs-measure) (pvector-ref-digit/fast lhs idx depth)]
-        [(< idx inner-measure) (pvector-ref/fast:impl inner (- idx lhs-measure) (add1 depth))]
-        [else (pvector-ref-digit/fast rhs (- idx inner-measure) depth)])]))
+  ;; Check if first segment is pvector (prefix)
+  (define-values (prefix-var rest-segs)
+    (if (pvector-segment? (car seg-list))
+        (values (car seg-list) (cdr seg-list))
+        (values #f seg-list)))
 
-(define (pvector-ref/fast pv idx)
-  (cond
-    [(< idx 0) (error 'pvector-ref/fast "index out of bounds: ~a" idx)]
-    [(>= idx (measure:ft core/size pv 0)) (error 'pvector-ref/fast "index out of bounds: ~a" idx)]
-    [else (pvector-ref/fast:impl pv idx 0)]))
+  ;; Check if last segment is pvector (suffix)
+  (define-values (suffix-var middle-segs)
+    (if (and (not (null? rest-segs))
+             (pvector-segment? (last rest-segs)))
+        (values (last rest-segs) (drop-right rest-segs 1))
+        (values #f rest-segs)))
 
-;; Fast set: uses digit-update-by-measure instead of digit-add-list
-(define (pvector-set-node/fast node idx value depth)
-  (match depth
-    [0 value]
-    [_ (define measure-fn (make-measure-fn (sub1 depth)))
-      (define (update-fn child child-idx)
-        (pvector-set-node/fast child child-idx value (sub1 depth)))
-      (define (rebuild-fn . children)
-        (match children
-          [(list a b) (build-node2 core/size a b (sub1 depth))]
-          [(list a b c) (build-node3 core/size a b c (sub1 depth))]))
-      (node-update-by-measure node idx measure-fn update-fn rebuild-fn)]))
+  ;; Middle segments are fixed element patterns
+  (values prefix-var middle-segs suffix-var))
 
-(define (pvector-set-digit/fast digit idx value depth)
-  (define measure-fn (make-measure-fn depth))
-  (define (update-fn node node-idx)
-    (pvector-set-node/fast node node-idx value depth))
-  (digit-update-by-measure digit idx measure-fn update-fn))
+;; Generate the match code
+(define-for-syntax (generate-pvector**-match input-stx segments)
+  (define-values (prefix-var fixed-pats suffix-var)
+    (parse-pvector**-segments segments))
+  (define fixed-count (length fixed-pats))
 
-(define (pvector-set/fast:impl pv idx value depth)
-  (match pv
-    [(ft:single r) (ft:single (pvector-set-node/fast r idx value depth))]
-    [(ft:deep v lhs inner rhs)
-      (define lhs-measure (measure:digit core/size lhs depth))
-      (define inner-measure (+ lhs-measure (measure:ft core/size inner (add1 depth))))
-      (cond
-        [(< idx lhs-measure)
-          (ft:deep v (pvector-set-digit/fast lhs idx value depth) inner rhs)]
-        [(< idx inner-measure)
-          (ft:deep v lhs (pvector-set/fast:impl inner (- idx lhs-measure) value (add1 depth)) rhs)]
-        [(< idx v)
-          (ft:deep v lhs inner (pvector-set-digit/fast rhs (- idx inner-measure) value depth))]
-        [else (error 'pvector-set/fast "index out of bounds")])]))
+  (with-syntax ([input input-stx]
+                [fixed-n fixed-count])
+    (cond
+      ;; No variable segments - just match fixed elements
+      [(and (not prefix-var) (not suffix-var))
+       (with-syntax ([(pat ...) fixed-pats])
+         #'(and (? pvector?)
+                (? (lambda (pv) (= (pvector-length pv) fixed-n)))
+                (app pvector->list (list pat ...))))]
 
-(define (pvector-set/fast pv idx val)
-  (cond
-    [(< idx 0) (error 'pvector-set/fast "index out of bounds: ~a" idx)]
-    [(>= idx (measure:ft core/size pv 0)) (error 'pvector-set/fast "index out of bounds: ~a" idx)]
-    [else (pvector-set/fast:impl pv idx val 0)]))
+      ;; Only prefix variable segment
+      [(and prefix-var (not suffix-var))
+       (syntax-case prefix-var (pvector)
+         [(pvector len-pat pv-pat)
+          (with-syntax ([(fixed-pat ...) fixed-pats])
+            #'(? pvector?
+                 (app (lambda (pv)
+                        (define len (pvector-length pv))
+                        (define prefix-len (- len fixed-n))
+                        (if (>= prefix-len 0)
+                            (list prefix-len
+                                  (pvector-take pv prefix-len)
+                                  (pvector->list (pvector-drop pv prefix-len)))
+                            #f))
+                      (list len-pat pv-pat (list fixed-pat ...)))))])]
+
+      ;; Only suffix variable segment
+      [(and (not prefix-var) suffix-var)
+       (syntax-case suffix-var (pvector)
+         [(pvector len-pat pv-pat)
+          (with-syntax ([(fixed-pat ...) fixed-pats])
+            #'(? pvector?
+                 (app (lambda (pv)
+                        (define len (pvector-length pv))
+                        (define suffix-len (- len fixed-n))
+                        (if (>= suffix-len 0)
+                            (list (pvector->list (pvector-take pv fixed-n))
+                                  suffix-len
+                                  (pvector-drop pv fixed-n))
+                            #f))
+                      (list (list fixed-pat ...) len-pat pv-pat))))])]
+
+      ;; Both prefix and suffix variable segments
+      [else
+       (syntax-case prefix-var (pvector)
+         [(pvector prefix-len-pat prefix-pv-pat)
+          (syntax-case suffix-var (pvector)
+            [(pvector suffix-len-pat suffix-pv-pat)
+             (with-syntax ([(fixed-pat ...) fixed-pats])
+               ;; Check if suffix-len is '_' (greedy suffix takes all remaining)
+               (if (and (identifier? #'suffix-len-pat)
+                        (free-identifier=? #'suffix-len-pat #'_))
+                   ;; Suffix is greedy - prefix gets 0, suffix gets rest
+                   #'(? pvector?
+                        (app (lambda (pv)
+                               (define len (pvector-length pv))
+                               (define suffix-len (- len fixed-n))
+                               (if (>= suffix-len 0)
+                                   (list 0
+                                         (pvector-empty)
+                                         (pvector->list (pvector-take pv fixed-n))
+                                         suffix-len
+                                         (pvector-drop pv fixed-n))
+                                   #f))
+                             (list prefix-len-pat prefix-pv-pat
+                                   (list fixed-pat ...)
+                                   suffix-len-pat suffix-pv-pat)))
+                   ;; Check if prefix-len is '_' (greedy prefix takes all remaining)
+                   (if (and (identifier? #'prefix-len-pat)
+                            (free-identifier=? #'prefix-len-pat #'_))
+                       ;; Prefix is greedy - suffix gets 0, prefix gets rest
+                       #'(? pvector?
+                            (app (lambda (pv)
+                                   (define len (pvector-length pv))
+                                   (define prefix-len (- len fixed-n))
+                                   (if (>= prefix-len 0)
+                                       (list prefix-len
+                                             (pvector-take pv prefix-len)
+                                             (pvector->list (pvector-drop pv prefix-len))
+                                             0
+                                             (pvector-empty))
+                                       #f))
+                                 (list prefix-len-pat prefix-pv-pat
+                                       (list fixed-pat ...)
+                                       suffix-len-pat suffix-pv-pat)))
+                       ;; Neither is '_' - both get 0, all goes to fixed
+                       #'(? pvector?
+                            (app (lambda (pv)
+                                   (define len (pvector-length pv))
+                                   (if (= len fixed-n)
+                                       (list 0 (pvector-empty)
+                                             (pvector->list pv)
+                                             0 (pvector-empty))
+                                       #f))
+                                 (list prefix-len-pat prefix-pv-pat
+                                       (list fixed-pat ...)
+                                       suffix-len-pat suffix-pv-pat))))))])])])))
+
+(define-match-expander pvector**
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_ seg ...)
+       (generate-pvector**-match #'input #'(seg ...))])))
 
 ;; Exports
 (provide pvector-delete)
@@ -677,6 +753,6 @@
 ;; Comprehensions
 (provide for/pvector for*/pvector)
 ;; Match expanders
-(provide pvector pvector*)
-;; Fast (zero-allocation) API
+(provide pvector pvector* pvector**)
+;; Backwards compatibility (now aliases to default)
 (provide pvector-ref/fast pvector-set/fast)
