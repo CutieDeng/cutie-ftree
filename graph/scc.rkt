@@ -18,7 +18,7 @@
          "../pvector.rkt"
          "../ordered-map.rkt"
          "../comparator.rkt"
-         "../graph.rkt")
+         "unsafe.rkt")  ; Use unsafe impl for performance
 
 (provide
   ;; Concrete API (Graph type)
@@ -49,7 +49,7 @@
 ;; - Source SCCs appear last
 ;;
 (define (graph-scc g)
-  (define vertices (graph-vertices-set g))  ; bitset of active vertex vals
+  (define vertices (graph-vertices-set-impl g))  ; bitset of active vertex vals
 
   ;; Tarjan state
   (define index-counter 0)
@@ -68,9 +68,9 @@
     (set! stack (pvector-cons-right stack v))
     (set! on-stack (bitset-add on-stack v))
 
-    ;; Visit successors - graph-successors returns bitset of vertex vals
+    ;; Visit successors - graph-successors-impl returns bitset of vertex vals
     ;; Use in-bitset/rev for ~5x better iteration performance
-    (for ([w (in-bitset/rev (graph-successors g (vertex-id v)))])
+    (for ([w (in-bitset/rev (graph-successors-impl g v))])
       (cond
         [(not (ordered-map-has-key? index w))
          ;; w not yet visited
@@ -130,10 +130,10 @@
   ;; Build SCC adjacency (bitset-based)
   (define scc-adj
     (for/fold ([adj (ordered-map-empty integer-compare)])
-              ([v (in-bitset/rev (graph-vertices-set g))])
+              ([v (in-bitset/rev (graph-vertices-set-impl g))])
       (define src-scc (dict-ref node->scc v 0))
       (for/fold ([adj* adj])
-                ([w (in-bitset/rev (graph-successors g (vertex-id v)))])
+                ([w (in-bitset/rev (graph-successors-impl g v))])
         (define dst-scc (dict-ref node->scc w 0))
         (if (= src-scc dst-scc)
             adj*

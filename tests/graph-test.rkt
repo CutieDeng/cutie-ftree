@@ -3,6 +3,17 @@
 (require rackunit)
 (require "../graph.rkt")
 (require "../bitset.rkt")
+(require "../pvector.rkt")
+
+;; Helper: check if pvector contains a vertex-id with given val
+(define (pvector-has-vertex-val? pv val)
+  (for/or ([v (in-pvector pv)])
+    (= (vertex-id-val v) val)))
+
+;; Helper: check if pvector contains an edge-id with given val
+(define (pvector-has-edge-val? pv val)
+  (for/or ([e (in-pvector pv)])
+    (= (edge-id-val e) val)))
 
 ;; ========================================
 ;; Basic Construction
@@ -216,10 +227,10 @@
   (check-equal? (graph-edge-count g5) 3)
 
   (define edges-between (graph-edges-between g5 v0 v1))
-  (check-equal? (bitset-count edges-between) 3)
-  (check-true (bitset-member? edges-between (edge-id-val e0)))
-  (check-true (bitset-member? edges-between (edge-id-val e1)))
-  (check-true (bitset-member? edges-between (edge-id-val e2))))
+  (check-equal? (pvector-length edges-between) 3)
+  (check-true (pvector-has-edge-val? edges-between (edge-id-val e0)))
+  (check-true (pvector-has-edge-val? edges-between (edge-id-val e1)))
+  (check-true (pvector-has-edge-val? edges-between (edge-id-val e2))))
 
 ;; ========================================
 ;; Adjacency Queries
@@ -234,16 +245,16 @@
   (define-values (g6 e2) (graph-add-edge g5 v1 v2))
 
   ;; v0: out={e0,e1}, in={}
-  (check-equal? (bitset-count (graph-out-edges g6 v0)) 2)
-  (check-equal? (bitset-count (graph-in-edges g6 v0)) 0)
+  (check-equal? (pvector-length (graph-out-edges g6 v0)) 2)
+  (check-equal? (pvector-length (graph-in-edges g6 v0)) 0)
 
   ;; v1: out={e2}, in={e0}
-  (check-equal? (bitset-count (graph-out-edges g6 v1)) 1)
-  (check-equal? (bitset-count (graph-in-edges g6 v1)) 1)
+  (check-equal? (pvector-length (graph-out-edges g6 v1)) 1)
+  (check-equal? (pvector-length (graph-in-edges g6 v1)) 1)
 
   ;; v2: out={}, in={e1,e2}
-  (check-equal? (bitset-count (graph-out-edges g6 v2)) 0)
-  (check-equal? (bitset-count (graph-in-edges g6 v2)) 2))
+  (check-equal? (pvector-length (graph-out-edges g6 v2)) 0)
+  (check-equal? (pvector-length (graph-in-edges g6 v2)) 2))
 
 (test-case "graph-in-degree and graph-out-degree"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -263,9 +274,9 @@
   (define-values (g4 e0) (graph-add-edge g3 v0 v1))
   (define-values (g5 e1) (graph-add-edge g4 v0 v1))
 
-  (check-equal? (bitset-count (graph-edges-between g5 v0 v1)) 2)
-  (check-equal? (bitset-count (graph-edges-between g5 v1 v0)) 0)
-  (check-equal? (bitset-count (graph-edges-between g5 v0 v2)) 0))
+  (check-equal? (pvector-length (graph-edges-between g5 v0 v1)) 2)
+  (check-equal? (pvector-length (graph-edges-between g5 v1 v0)) 0)
+  (check-equal? (pvector-length (graph-edges-between g5 v0 v2)) 0))
 
 (test-case "graph-has-edge-to?"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -283,9 +294,9 @@
   (define-values (g5 e1) (graph-add-edge g4 v0 v2))
 
   (define succs (graph-successors g5 v0))
-  (check-equal? (bitset-count succs) 2)
-  (check-true (bitset-member? succs (vertex-id-val v1)))
-  (check-true (bitset-member? succs (vertex-id-val v2))))
+  (check-equal? (pvector-length succs) 2)
+  (check-true (pvector-has-vertex-val? succs (vertex-id-val v1)))
+  (check-true (pvector-has-vertex-val? succs (vertex-id-val v2))))
 
 (test-case "graph-predecessors"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -295,9 +306,9 @@
   (define-values (g5 e1) (graph-add-edge g4 v1 v2))
 
   (define preds (graph-predecessors g5 v2))
-  (check-equal? (bitset-count preds) 2)
-  (check-true (bitset-member? preds (vertex-id-val v0)))
-  (check-true (bitset-member? preds (vertex-id-val v1))))
+  (check-equal? (pvector-length preds) 2)
+  (check-true (pvector-has-vertex-val? preds (vertex-id-val v0)))
+  (check-true (pvector-has-vertex-val? preds (vertex-id-val v1))))
 
 ;; ========================================
 ;; Iteration
@@ -360,8 +371,8 @@
   (check-equal? (graph-out-degree g8 v0) 2)
   (check-equal? (graph-in-degree g8 v3) 2)
 
-  (check-equal? (bitset-count (graph-successors g8 v0)) 2)
-  (check-equal? (bitset-count (graph-predecessors g8 v3)) 2))
+  (check-equal? (pvector-length (graph-successors g8 v0)) 2)
+  (check-equal? (pvector-length (graph-predecessors g8 v3)) 2))
 
 (test-case "remove vertex in middle"
   (define-values (g1 v0) (graph-add-vertex graph-empty))

@@ -1,26 +1,34 @@
 #lang racket/base
 
 ;; ============================================================
-;; Graph: MultiGraph with automatic ID management
+;; Graph: Safe MultiGraph API
 ;; ============================================================
 ;;
-;; Features:
-;; - Automatic vertex/edge ID allocation (monotonically increasing)
-;; - Multi-edge support (multiple edges between same vertices)
-;; - Edge pairing (for bidirectional relationships)
-;; - O(1) cached counts
-;; - Three-level adjacency map: src → dst → edges
+;; This is the safe, user-facing API for the Graph module.
+;;
+;; Key safety features:
+;; - vertex-id and edge-id constructors are NOT exported
+;; - Only graph operations can create valid IDs
+;; - Type validation on all inputs
+;; - Returns (pvector vertex-id) instead of raw bitsets
+;;
+;; For performance-critical internal code, use:
+;;   (require cutie-ftree/graph/unsafe)
 ;; ============================================================
 
-(require racket/match)
-(require "bitset.rkt")
-(require "ordered-map.rkt")
-(require "comparator.rkt")
+(require racket/match
+         "pvector.rkt"
+         "bitset.rkt"
+         "ordered-map.rkt"
+         "comparator.rkt"
+         "graph/unsafe.rkt")
 
 ;; ========================================
-;; ID Types
+;; ID Types (struct definitions)
 ;; ========================================
 
+;; Keep struct definitions here for safe API
+;; The constructors are NOT exported
 (struct vertex-id (val) #:transparent)
 (struct edge-id (val) #:transparent)
 
@@ -31,407 +39,221 @@
   (integer-compare (edge-id-val a) (edge-id-val b)))
 
 ;; ========================================
-;; Graph Structure
+;; Input Validation Helpers
 ;; ========================================
 
-(struct graph
-  (
-    ;; ID Management
-    next-vertex-id    ; integer: next new vertex ID
-    next-edge-id      ; integer: next new edge ID
+(define (check-vertex-id who g v pos)
+  (unless (vertex-id? v)
+    (raise-argument-error who "vertex-id?" pos v))
+  (unless (graph-vertex?-impl g (vertex-id-val v))
+    (error who "vertex does not exist in graph: ~a" v)))
 
-    ;; Active sets
-    vertices          ; bitset: active vertex ID values
-    edges             ; bitset: active edge ID values
-
-    ;; Cache
-    vertex-count*     ; integer: number of vertices
-    edge-count*       ; integer: number of edges
-
-    ;; Edge → Endpoint mapping
-    edge-src*         ; ordered-map: edge-val → vertex-val
-    edge-dst*         ; ordered-map: edge-val → vertex-val
-
-    ;; Edge pairing
-    edge-pair*        ; ordered-map: edge-val → edge-val
-
-    ;; Vertex adjacency
-    in-edges*         ; ordered-map: vertex-val → bitset
-    out-edges*        ; ordered-map: vertex-val → bitset
-
-    ;; Three-level nesting: adjacency[src][dst] = {edges...}
-    adjacency         ; ordered-map: vertex-val → ordered-map → bitset
-  )
-  #:transparent)
+(define (check-edge-id who g e pos)
+  (unless (edge-id? e)
+    (raise-argument-error who "edge-id?" pos e))
+  (unless (graph-edge?-impl g (edge-id-val e))
+    (error who "edge does not exist in graph: ~a" e)))
 
 ;; ========================================
-;; Constructor
-;; ========================================
-
-(define graph-empty
-  (graph
-    0                                      ; next-vertex-id
-    0                                      ; next-edge-id
-    bitset-empty                           ; vertices
-    bitset-empty                           ; edges
-    0                                      ; vertex-count*
-    0                                      ; edge-count*
-    (ordered-map-empty integer-compare)    ; edge-src*
-    (ordered-map-empty integer-compare)    ; edge-dst*
-    (ordered-map-empty integer-compare)    ; edge-pair*
-    (ordered-map-empty integer-compare)    ; in-edges*
-    (ordered-map-empty integer-compare)    ; out-edges*
-    (ordered-map-empty integer-compare)))  ; adjacency
-
-;; ========================================
-;; ID Allocation Helpers
-;; ========================================
-
-;; Allocate a new vertex ID (always uses next available)
-(define (alloc-vertex-id g)
-  (match-define (graph next-v next-e verts edges
-                       v-cnt e-cnt e-src e-dst e-pair
-                       in-e out-e adj) g)
-  (values (graph (add1 next-v) next-e
-                 verts edges v-cnt e-cnt e-src e-dst e-pair
-                 in-e out-e adj)
-          next-v))
-
-;; Allocate a new edge ID (always uses next available)
-(define (alloc-edge-id g)
-  (match-define (graph next-v next-e verts edges
-                       v-cnt e-cnt e-src e-dst e-pair
-                       in-e out-e adj) g)
-  (values (graph next-v (add1 next-e)
-                 verts edges v-cnt e-cnt e-src e-dst e-pair
-                 in-e out-e adj)
-          next-e))
-
-;; ========================================
-;; Vertex Operations
+;; Vertex Operations (Safe API)
 ;; ========================================
 
 ;; Add a new vertex, returns (values new-graph vertex-id)
 (define (graph-add-vertex g)
-  (define-values (g1 vid) (alloc-vertex-id g))
-  (match-define (graph next-v next-e verts edges
-                       v-cnt e-cnt e-src e-dst e-pair
-                       in-e out-e adj) g1)
-  (values
-    (graph next-v next-e
-           (bitset-add verts vid)
-           edges
-           (add1 v-cnt)
-           e-cnt
-           e-src e-dst e-pair
-           (ordered-map-set in-e vid bitset-empty)
-           (ordered-map-set out-e vid bitset-empty)
-           (ordered-map-set adj vid (ordered-map-empty integer-compare)))
-    (vertex-id vid)))
+  (define-values (g* vid) (graph-add-vertex-impl g))
+  (values g* (vertex-id vid)))
 
 ;; Check if vertex exists
 (define (graph-vertex? g v)
-  (bitset-member? (graph-vertices g) (vertex-id-val v)))
+  (and (vertex-id? v)
+       (graph-vertex?-impl g (vertex-id-val v))))
 
-;; Get all vertices as bitset
+;; Get all vertices as pvector of vertex-id
 (define (graph-vertices-set g)
-  (graph-vertices g))
+  (for/pvector ([v (in-bitset (graph-vertices-set-impl g))])
+    (vertex-id v)))
 
 ;; Get vertex count (cached)
 (define (graph-vertex-count g)
-  (graph-vertex-count* g))
+  (graph-vertex-count-impl g))
 
-;; Remove vertex (must have no edges, otherwise error)
+;; Remove vertex (must have no edges)
 (define (graph-remove-vertex g v)
+  (check-vertex-id 'graph-remove-vertex g v 1)
   (define vid (vertex-id-val v))
-  (unless (graph-vertex? g v)
-    (error 'graph-remove-vertex "vertex does not exist: ~a" v))
 
   ;; Check no edges
-  (define in-e (graph-in-edges g v))
-  (define out-e (graph-out-edges g v))
+  (define in-e (graph-in-edges-impl g vid))
+  (define out-e (graph-out-edges-impl g vid))
   (unless (bitset-empty? in-e)
     (error 'graph-remove-vertex "vertex has in-edges: ~a" v))
   (unless (bitset-empty? out-e)
     (error 'graph-remove-vertex "vertex has out-edges: ~a" v))
 
-  ;; Remove the vertex
-  (match-define (graph next-v next-e verts edges
-                       v-cnt e-cnt e-src e-dst e-pair
-                       in-e-map out-e-map adj) g)
-
-  (define-values (new-in-e _1) (ordered-map-delete in-e-map vid))
-  (define-values (new-out-e _2) (ordered-map-delete out-e-map vid))
-  (define-values (new-adj _3) (ordered-map-delete adj vid))
-
-  (graph next-v next-e
-         (bitset-remove verts vid)
-         edges
-         (sub1 v-cnt)
-         e-cnt
-         e-src e-dst e-pair
-         new-in-e new-out-e new-adj))
+  (graph-remove-vertex-impl g vid))
 
 ;; Remove vertex and all its edges (cascade delete)
 (define (graph-remove-vertex* g v)
+  (check-vertex-id 'graph-remove-vertex* g v 1)
   (define vid (vertex-id-val v))
-  (unless (graph-vertex? g v)
-    (error 'graph-remove-vertex* "vertex does not exist: ~a" v))
 
   ;; Collect all edges to remove
-  (define in-e (graph-in-edges g v))
-  (define out-e (graph-out-edges g v))
+  (define in-e (graph-in-edges-impl g vid))
+  (define out-e (graph-out-edges-impl g vid))
   (define all-edges (bitset-union in-e out-e))
 
   ;; Remove all edges first
   (define g1
     (for/fold ([g g]) ([eid (in-bitset all-edges)])
-      (if (graph-edge? g (edge-id eid))
-          (graph-remove-edge g (edge-id eid))
+      (if (graph-edge?-impl g eid)
+          (graph-remove-edge-impl g eid)
           g)))
 
   ;; Now remove the vertex itself
-  (graph-remove-vertex g1 v))
+  (graph-remove-vertex-impl g1 vid))
 
 ;; ========================================
-;; Edge Operations
+;; Edge Operations (Safe API)
 ;; ========================================
 
 ;; Add edge from src to dst, returns (values new-graph edge-id)
 (define (graph-add-edge g src dst)
-  (define src-v (vertex-id-val src))
-  (define dst-v (vertex-id-val dst))
-  (unless (graph-vertex? g src)
-    (error 'graph-add-edge "source vertex does not exist: ~a" src))
-  (unless (graph-vertex? g dst)
-    (error 'graph-add-edge "destination vertex does not exist: ~a" dst))
-
-  (define-values (g1 eid) (alloc-edge-id g))
-  (match-define (graph next-v next-e verts edges
-                       v-cnt e-cnt e-src e-dst e-pair
-                       in-e out-e adj) g1)
-
-  ;; Update edge endpoints
-  (define new-e-src (ordered-map-set e-src eid src-v))
-  (define new-e-dst (ordered-map-set e-dst eid dst-v))
-
-  ;; Update in-edges and out-edges
-  (define src-out (ordered-map-ref out-e src-v bitset-empty))
-  (define dst-in (ordered-map-ref in-e dst-v bitset-empty))
-  (define new-out-e (ordered-map-set out-e src-v (bitset-add src-out eid)))
-  (define new-in-e (ordered-map-set in-e dst-v (bitset-add dst-in eid)))
-
-  ;; Update adjacency (three-level)
-  (define src-adj (ordered-map-ref adj src-v (ordered-map-empty integer-compare)))
-  (define src-dst-edges (ordered-map-ref src-adj dst-v bitset-empty))
-  (define new-src-adj (ordered-map-set src-adj dst-v (bitset-add src-dst-edges eid)))
-  (define new-adj (ordered-map-set adj src-v new-src-adj))
-
-  (values
-    (graph next-v next-e
-           verts
-           (bitset-add edges eid)
-           v-cnt
-           (add1 e-cnt)
-           new-e-src new-e-dst e-pair
-           new-in-e new-out-e new-adj)
-    (edge-id eid)))
+  (check-vertex-id 'graph-add-edge g src 1)
+  (check-vertex-id 'graph-add-edge g dst 2)
+  (define-values (g* eid)
+    (graph-add-edge-impl g (vertex-id-val src) (vertex-id-val dst)))
+  (values g* (edge-id eid)))
 
 ;; Add edge pair (bidirectional), returns (values new-graph edge1 edge2)
 (define (graph-add-edge-pair g v1 v2)
-  (define-values (g1 e1) (graph-add-edge g v1 v2))
-  (define-values (g2 e2) (graph-add-edge g1 v2 v1))
-
-  ;; Link them as pairs
-  (define e1-val (edge-id-val e1))
-  (define e2-val (edge-id-val e2))
-  (match-define (graph next-v next-e verts edges
-                       v-cnt e-cnt e-src e-dst e-pair
-                       in-e out-e adj) g2)
-
-  (define new-e-pair
-    (ordered-map-set (ordered-map-set e-pair e1-val e2-val) e2-val e1-val))
-
-  (values
-    (graph next-v next-e verts edges
-           v-cnt e-cnt e-src e-dst new-e-pair
-           in-e out-e adj)
-    e1 e2))
+  (check-vertex-id 'graph-add-edge-pair g v1 1)
+  (check-vertex-id 'graph-add-edge-pair g v2 2)
+  (define-values (g* e1 e2)
+    (graph-add-edge-pair-impl g (vertex-id-val v1) (vertex-id-val v2)))
+  (values g* (edge-id e1) (edge-id e2)))
 
 ;; Check if edge exists
 (define (graph-edge? g e)
-  (bitset-member? (graph-edges g) (edge-id-val e)))
+  (and (edge-id? e)
+       (graph-edge?-impl g (edge-id-val e))))
 
-;; Get all edges as bitset
+;; Get all edges as pvector of edge-id
 (define (graph-edges-set g)
-  (graph-edges g))
+  (for/pvector ([e (in-bitset (graph-edges-set-impl g))])
+    (edge-id e)))
 
 ;; Get edge count (cached)
 (define (graph-edge-count g)
-  (graph-edge-count* g))
+  (graph-edge-count-impl g))
 
 ;; Get edge source vertex
 (define (graph-edge-src g e)
-  (define eid (edge-id-val e))
-  (match (ordered-map-query (graph-edge-src* g) eid)
-    [#f (error 'graph-edge-src "edge does not exist: ~a" e)]
-    [(cons _ v) (vertex-id v)]))
+  (check-edge-id 'graph-edge-src g e 1)
+  (define v (graph-edge-src-impl g (edge-id-val e)))
+  (vertex-id v))
 
 ;; Get edge destination vertex
 (define (graph-edge-dst g e)
-  (define eid (edge-id-val e))
-  (match (ordered-map-query (graph-edge-dst* g) eid)
-    [#f (error 'graph-edge-dst "edge does not exist: ~a" e)]
-    [(cons _ v) (vertex-id v)]))
+  (check-edge-id 'graph-edge-dst g e 1)
+  (define v (graph-edge-dst-impl g (edge-id-val e)))
+  (vertex-id v))
 
 ;; Get edge endpoints as (values src dst)
 (define (graph-edge-endpoints g e)
-  (values (graph-edge-src g e) (graph-edge-dst g e)))
+  (check-edge-id 'graph-edge-endpoints g e 1)
+  (define-values (src dst) (graph-edge-endpoints-impl g (edge-id-val e)))
+  (values (vertex-id src) (vertex-id dst)))
 
 ;; Get paired edge (or #f)
 (define (graph-edge-pair g e)
-  (define eid (edge-id-val e))
-  (match (ordered-map-query (graph-edge-pair* g) eid)
-    [#f #f]
-    [(cons _ paired-id) (edge-id paired-id)]))
+  (check-edge-id 'graph-edge-pair g e 1)
+  (define paired (graph-edge-pair-impl g (edge-id-val e)))
+  (and paired (edge-id paired)))
 
-;; Remove single edge (unlinks pair if exists, but doesn't delete pair)
+;; Remove single edge
 (define (graph-remove-edge g e)
-  (define eid (edge-id-val e))
-  (unless (graph-edge? g e)
-    (error 'graph-remove-edge "edge does not exist: ~a" e))
-
-  ;; Get endpoints
-  (define src-v (vertex-id-val (graph-edge-src g e)))
-  (define dst-v (vertex-id-val (graph-edge-dst g e)))
-
-  ;; Check for paired edge
-  (define paired (graph-edge-pair g e))
-
-  (match-define (graph next-v next-e verts edges
-                       v-cnt e-cnt e-src e-dst e-pair
-                       in-e out-e adj) g)
-
-  ;; Remove from edge-src and edge-dst
-  (define-values (new-e-src _1) (ordered-map-delete e-src eid))
-  (define-values (new-e-dst _2) (ordered-map-delete e-dst eid))
-
-  ;; Remove from edge-pair (unlink both directions if paired)
-  (define new-e-pair
-    (cond
-      [paired
-       (define paired-val (edge-id-val paired))
-       (define-values (p1 _3) (ordered-map-delete e-pair eid))
-       (define-values (p2 _4) (ordered-map-delete p1 paired-val))
-       p2]
-      [else
-       (define-values (p1 _3) (ordered-map-delete e-pair eid))
-       p1]))
-
-  ;; Remove from out-edges[src]
-  (define src-out (ordered-map-ref out-e src-v bitset-empty))
-  (define new-out-e (ordered-map-set out-e src-v (bitset-remove src-out eid)))
-
-  ;; Remove from in-edges[dst]
-  (define dst-in (ordered-map-ref in-e dst-v bitset-empty))
-  (define new-in-e (ordered-map-set in-e dst-v (bitset-remove dst-in eid)))
-
-  ;; Remove from adjacency[src][dst]
-  (define src-adj (ordered-map-ref adj src-v (ordered-map-empty integer-compare)))
-  (define src-dst-edges (ordered-map-ref src-adj dst-v bitset-empty))
-  (define new-src-dst-edges (bitset-remove src-dst-edges eid))
-  (define new-src-adj
-    (if (bitset-empty? new-src-dst-edges)
-        (let-values ([(m _) (ordered-map-delete src-adj dst-v)]) m)
-        (ordered-map-set src-adj dst-v new-src-dst-edges)))
-  (define new-adj (ordered-map-set adj src-v new-src-adj))
-
-  (graph next-v next-e
-         verts
-         (bitset-remove edges eid)
-         v-cnt
-         (sub1 e-cnt)
-         new-e-src new-e-dst new-e-pair
-         new-in-e new-out-e new-adj))
+  (check-edge-id 'graph-remove-edge g e 1)
+  (graph-remove-edge-impl g (edge-id-val e)))
 
 ;; Remove edge and its paired edge (if exists)
 (define (graph-remove-edge* g e)
-  (define paired (graph-edge-pair g e))
-  (define g1 (graph-remove-edge g e))
-  (if (and paired (graph-edge? g1 paired))
-      (graph-remove-edge g1 paired)
-      g1))
+  (check-edge-id 'graph-remove-edge* g e 1)
+  (graph-remove-edge*-impl g (edge-id-val e)))
 
 ;; Remove the single edge between src and dst (error if 0 or >1 edges)
 (define (graph-remove-edge-between g src dst)
-  (define edges (graph-edges-between g src dst))
+  (check-vertex-id 'graph-remove-edge-between g src 1)
+  (check-vertex-id 'graph-remove-edge-between g dst 2)
+  (define edges (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))
   (cond
     [(bitset-empty? edges)
      (error 'graph-remove-edge-between "no edge from ~a to ~a" src dst)]
     [(> (bitset-count edges) 1)
      (error 'graph-remove-edge-between "multiple edges from ~a to ~a, use graph-remove-edges-between" src dst)]
     [else
-     (graph-remove-edge g (edge-id (bitset-min edges)))]))
+     (graph-remove-edge-impl g (bitset-min edges))]))
 
 ;; Remove all edges from src to dst
 (define (graph-remove-edges-between g src dst)
-  (define edges (graph-edges-between g src dst))
+  (check-vertex-id 'graph-remove-edges-between g src 1)
+  (check-vertex-id 'graph-remove-edges-between g dst 2)
+  (define edges (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))
   (for/fold ([g g]) ([eid (in-bitset edges)])
-    (graph-remove-edge g (edge-id eid))))
+    (graph-remove-edge-impl g eid)))
 
 ;; ========================================
-;; Adjacency Queries
+;; Adjacency Queries (Safe API)
 ;; ========================================
 
-;; Get in-edges of vertex (bitset)
+;; Get in-edges of vertex as pvector of edge-id
 (define (graph-in-edges g v)
-  (define vid (vertex-id-val v))
-  (ordered-map-ref (graph-in-edges* g) vid bitset-empty))
+  (check-vertex-id 'graph-in-edges g v 1)
+  (for/pvector ([e (in-bitset (graph-in-edges-impl g (vertex-id-val v)))])
+    (edge-id e)))
 
-;; Get out-edges of vertex (bitset)
+;; Get out-edges of vertex as pvector of edge-id
 (define (graph-out-edges g v)
-  (define vid (vertex-id-val v))
-  (ordered-map-ref (graph-out-edges* g) vid bitset-empty))
+  (check-vertex-id 'graph-out-edges g v 1)
+  (for/pvector ([e (in-bitset (graph-out-edges-impl g (vertex-id-val v)))])
+    (edge-id e)))
 
 ;; Get in-degree
 (define (graph-in-degree g v)
-  (bitset-count (graph-in-edges g v)))
+  (check-vertex-id 'graph-in-degree g v 1)
+  (graph-in-degree-impl g (vertex-id-val v)))
 
 ;; Get out-degree
 (define (graph-out-degree g v)
-  (bitset-count (graph-out-edges g v)))
+  (check-vertex-id 'graph-out-degree g v 1)
+  (graph-out-degree-impl g (vertex-id-val v)))
 
-;; Get edges from src to dst (bitset)
+;; Get edges from src to dst as pvector of edge-id
 (define (graph-edges-between g src dst)
-  (define src-v (vertex-id-val src))
-  (define dst-v (vertex-id-val dst))
-  (define src-adj (ordered-map-ref (graph-adjacency g) src-v #f))
-  (if src-adj
-      (ordered-map-ref src-adj dst-v bitset-empty)
-      bitset-empty))
+  (check-vertex-id 'graph-edges-between g src 1)
+  (check-vertex-id 'graph-edges-between g dst 2)
+  (for/pvector ([e (in-bitset (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))])
+    (edge-id e)))
 
 ;; Check if there's any edge from src to dst
 (define (graph-has-edge-to? g src dst)
-  (not (bitset-empty? (graph-edges-between g src dst))))
+  (check-vertex-id 'graph-has-edge-to? g src 1)
+  (check-vertex-id 'graph-has-edge-to? g dst 2)
+  (graph-has-edge-to?-impl g (vertex-id-val src) (vertex-id-val dst)))
 
-;; Get successor vertices (bitset of vertex vals)
+;; Get successor vertices as pvector of vertex-id
 (define (graph-successors g v)
-  (define vid (vertex-id-val v))
-  (define v-adj (ordered-map-ref (graph-adjacency g) vid #f))
-  (if v-adj
-      (for/bitset ([kv (in-ordered-map v-adj)])
-        (car kv))
-      bitset-empty))
+  (check-vertex-id 'graph-successors g v 1)
+  (for/pvector ([vid (in-bitset (graph-successors-impl g (vertex-id-val v)))])
+    (vertex-id vid)))
 
-;; Get predecessor vertices (bitset of vertex vals)
+;; Get predecessor vertices as pvector of vertex-id
 (define (graph-predecessors g v)
-  (define vid (vertex-id-val v))
-  (define in-e (graph-in-edges g v))
-  (for/bitset ([eid (in-bitset in-e)])
-    (vertex-id-val (graph-edge-src g (edge-id eid)))))
+  (check-vertex-id 'graph-predecessors g v 1)
+  (for/pvector ([vid (in-bitset (graph-predecessors-impl g (vertex-id-val v)))])
+    (vertex-id vid)))
 
 ;; ========================================
-;; Iteration
+;; Iteration (Safe API)
 ;; ========================================
 
 (require racket/generator)
@@ -439,44 +261,48 @@
 ;; Iterate over vertex-ids
 (define (in-graph-vertices g)
   (in-generator
-    (for ([v (in-bitset (graph-vertices g))])
+    (for ([v (in-bitset (graph-vertices-set-impl g))])
       (yield (vertex-id v)))))
 
 ;; Iterate over edge-ids
 (define (in-graph-edges g)
   (in-generator
-    (for ([e (in-bitset (graph-edges g))])
+    (for ([e (in-bitset (graph-edges-set-impl g))])
       (yield (edge-id e)))))
 
 ;; Iterate over (edge-id src dst) tuples for out-edges of a vertex
 (define (in-graph-out-edges g v)
+  (check-vertex-id 'in-graph-out-edges g v 1)
+  (define vid (vertex-id-val v))
   (in-generator
-    (for ([eid (in-bitset (graph-out-edges g v))])
-      (define e (edge-id eid))
-      (yield (values e (graph-edge-src g e) (graph-edge-dst g e))))))
+    (for ([eid (in-bitset (graph-out-edges-impl g vid))])
+      (define-values (src dst) (graph-edge-endpoints-impl g eid))
+      (yield (values (edge-id eid) (vertex-id src) (vertex-id dst))))))
 
 ;; Iterate over successor vertex-ids
 (define (in-graph-successors g v)
+  (check-vertex-id 'in-graph-successors g v 1)
   (in-generator
-    (for ([vid (in-bitset (graph-successors g v))])
+    (for ([vid (in-bitset (graph-successors-impl g (vertex-id-val v)))])
       (yield (vertex-id vid)))))
 
 ;; Iterate over predecessor vertex-ids
 (define (in-graph-predecessors g v)
+  (check-vertex-id 'in-graph-predecessors g v 1)
   (in-generator
-    (for ([vid (in-bitset (graph-predecessors g v))])
+    (for ([vid (in-bitset (graph-predecessors-impl g (vertex-id-val v)))])
       (yield (vertex-id vid)))))
 
 ;; ========================================
 ;; Exports
 ;; ========================================
 
-;; ID Types
-(provide vertex-id vertex-id? vertex-id-val)
-(provide edge-id edge-id? edge-id-val)
+;; ID Types - NO constructors exported!
+(provide vertex-id? vertex-id-val)
+(provide edge-id? edge-id-val)
 (provide vertex-id-compare edge-id-compare)
 
-;; Graph struct
+;; Graph struct - re-export from unsafe
 (provide graph graph? graph-empty)
 
 ;; Vertex operations
