@@ -131,6 +131,16 @@
 (define (com-has-key? om key)
   (ordered-map-has-key? (unwrap-om om) (check-key-in om key)))
 
+;; Ordinal query operations
+(define (com-rank om key)
+  (ordered-map-rank (unwrap-om om) (check-key-in om key)))
+
+(define (com-select om rank)
+  (check-kv-out om (ordered-map-select (unwrap-om om) rank)))
+
+(define (com-count-less-than om key)
+  (ordered-map-count-less-than (unwrap-om om) (check-key-in om key)))
+
 ;; Type check that accepts both
 (define (com? v)
   (or (ordered-map? v) (contracted-ordered-map? v)))
@@ -188,6 +198,11 @@
 
   ;; Sequence (lazy query-based)
   [in-ordered-map/lazy (-> ordered-map/c sequence?)]
+
+  ;; Ordinal query operations
+  [ordered-map-rank (-> ordered-map/c any/c (or/c #f exact-nonnegative-integer?))]
+  [ordered-map-select (-> ordered-map/c exact-integer? (or/c #f pair?))]
+  [ordered-map-count-less-than (-> ordered-map/c any/c exact-nonnegative-integer?)]
 )
 
 ;; Comprehensions (syntax, no contracts needed)
@@ -214,7 +229,10 @@
     [com-max ordered-map-max*]
     [com-count ordered-map-count*]
     [com-empty? ordered-map-empty?*]
-    [com-has-key? ordered-map-has-key?*]))
+    [com-has-key? ordered-map-has-key?*]
+    [com-rank ordered-map-rank*]
+    [com-select ordered-map-select*]
+    [com-count-less-than ordered-map-count-less-than*]))
 
 ;; ========================================
 ;; Unified API: same names, contract-aware
@@ -231,4 +249,7 @@
     [com-max safe:ordered-map-max]
     [com-count safe:ordered-map-count]
     [com-empty? safe:ordered-map-empty?]
-    [com-has-key? safe:ordered-map-has-key?]))
+    [com-has-key? safe:ordered-map-has-key?]
+    [com-rank safe:ordered-map-rank]
+    [com-select safe:ordered-map-select]
+    [com-count-less-than safe:ordered-map-count-less-than]))

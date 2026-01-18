@@ -209,3 +209,90 @@
   (check-equal? (ordered-map-ref m 1) "one")
   (check-equal? (ordered-map-ref m 2) "two")
   (check-equal? (ordered-map-ref m 3 "default") "default"))
+
+;; ========================================
+;; Ordinal Query Tests
+;; ========================================
+
+(test-case "ordered-map-rank on empty map"
+  (define m (ordered-map-empty integer-compare))
+  (check-equal? (ordered-map-rank m 5) #f))
+
+(test-case "ordered-map-rank basic"
+  (define m (ordered-map-empty integer-compare))
+  (for ([i '(10 20 30 40 50)])
+    (set! m (ordered-map-insert m i i #f)))
+  ;; ranks are 0-indexed
+  (check-equal? (ordered-map-rank m 10) 0)
+  (check-equal? (ordered-map-rank m 20) 1)
+  (check-equal? (ordered-map-rank m 30) 2)
+  (check-equal? (ordered-map-rank m 40) 3)
+  (check-equal? (ordered-map-rank m 50) 4)
+  ;; non-existent key
+  (check-equal? (ordered-map-rank m 25) #f)
+  (check-equal? (ordered-map-rank m 0) #f)
+  (check-equal? (ordered-map-rank m 100) #f))
+
+(test-case "ordered-map-select on empty map"
+  (define m (ordered-map-empty integer-compare))
+  (check-equal? (ordered-map-select m 0) #f))
+
+(test-case "ordered-map-select basic"
+  (define m (ordered-map-empty integer-compare))
+  (for ([i '(10 20 30 40 50)])
+    (set! m (ordered-map-insert m i (* i 2) #f)))
+  ;; select by rank (0-indexed)
+  (check-equal? (ordered-map-select m 0) (cons 10 20))
+  (check-equal? (ordered-map-select m 1) (cons 20 40))
+  (check-equal? (ordered-map-select m 2) (cons 30 60))
+  (check-equal? (ordered-map-select m 3) (cons 40 80))
+  (check-equal? (ordered-map-select m 4) (cons 50 100))
+  ;; out of bounds
+  (check-equal? (ordered-map-select m -1) #f)
+  (check-equal? (ordered-map-select m 5) #f)
+  (check-equal? (ordered-map-select m 100) #f))
+
+(test-case "ordered-map-count-less-than on empty map"
+  (define m (ordered-map-empty integer-compare))
+  (check-equal? (ordered-map-count-less-than m 5) 0))
+
+(test-case "ordered-map-count-less-than basic"
+  (define m (ordered-map-empty integer-compare))
+  (for ([i '(10 20 30 40 50)])
+    (set! m (ordered-map-insert m i i #f)))
+  (check-equal? (ordered-map-count-less-than m 0) 0)
+  (check-equal? (ordered-map-count-less-than m 10) 0)
+  (check-equal? (ordered-map-count-less-than m 15) 1)
+  (check-equal? (ordered-map-count-less-than m 20) 1)
+  (check-equal? (ordered-map-count-less-than m 25) 2)
+  (check-equal? (ordered-map-count-less-than m 50) 4)
+  (check-equal? (ordered-map-count-less-than m 100) 5))
+
+(test-case "ordinal queries large scale"
+  (define m (ordered-map-empty integer-compare))
+  (for ([i (in-range 0 1000 2)])  ; even numbers 0, 2, 4, ..., 998
+    (set! m (ordered-map-insert m i i #f)))
+  ;; 500 elements total
+  (check-equal? (ordered-map-count m) 500)
+  ;; rank of element 100 is 50 (elements 0,2,4,...,98 come before)
+  (check-equal? (ordered-map-rank m 100) 50)
+  ;; select rank 50 should give us 100
+  (check-equal? (ordered-map-select m 50) (cons 100 100))
+  ;; count-less-than 100 is 50
+  (check-equal? (ordered-map-count-less-than m 100) 50)
+  ;; odd number doesn't exist
+  (check-equal? (ordered-map-rank m 101) #f)
+  ;; count-less-than 101 is still 51 (0,2,...,100)
+  (check-equal? (ordered-map-count-less-than m 101) 51))
+
+(test-case "rank and select are inverse operations"
+  (define m (ordered-map-empty integer-compare))
+  (for ([i (in-range 100)])
+    (set! m (ordered-map-insert m (* i 7) i #f)))  ; keys: 0, 7, 14, 21, ...
+  ;; for each key, rank then select should give back the same element
+  (for ([i (in-range 100)])
+    (define key (* i 7))
+    (define rank (ordered-map-rank m key))
+    (check-equal? rank i)
+    (define elem (ordered-map-select m rank))
+    (check-equal? (car elem) key)))
