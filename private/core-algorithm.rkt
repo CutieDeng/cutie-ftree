@@ -260,7 +260,6 @@
 ; 2 .. 8
 (define (list->nodes:impl core rest depth)
   (match-define (ft:config _ _ as) core)
-  (printf "rest: ~a\n" rest)
   (match rest
     [`(,a ,b ,c ,d) (list
       (node:2 (as (measure:node core a depth) (measure:node core b depth)) a b)
@@ -287,8 +286,9 @@
     [((ft:deep lhs-v lhs-left lhs-inner lhs-right) (ft:deep rhs-v rhs-left rhs-inner rhs-right))
       (define mid (digit-add-list lhs-right (digit-add-list rhs-left '())))
       (define mid^ (list->nodes:impl core mid depth))
+      ;; mid^ contains nodes at depth+1, so consR into inner at depth+1
       (define left-inner^ (for/fold ([i lhs-inner]) ([m mid^])
-        (consR:impl core i m depth)
+        (consR:impl core i m (add1 depth))
       ))
       (define inner^ (concat:impl core left-inner^ rhs-inner (add1 depth)))
       (match-define (ft:config _ _ as) core)
@@ -505,8 +505,160 @@
             (rebuild-fn a (update-fn b idx) c)
             (rebuild-fn a b (update-fn c (- idx b-sz))))))]))
 
+;; ========================================
+;; Split Operation (Hinze & Paterson)
+;; ========================================
+;;
+;; split:impl finds the first element where predicate p becomes true
+;; on the accumulated measure. Returns (values left elem right).
+;;
+;; Predicate p must be monotonic: once true, stays true.
+;; Complexity: O(log n)
+
+;; Split result: (values left-tree element right-tree)
+;; If predicate never becomes true, behavior is undefined.
+
+(define (split:impl core p ft depth)
+  (match ft
+    [(ft:empty)
+     (error 'split:impl "split of empty tree")]
+    [(ft:single x)
+     (values (ft:empty) x (ft:empty))]
+    [(ft:deep _ pr m sf)
+     (match-define (ft:config e _ as) core)
+     (define i (e))  ; identity
+     (define vpr (as i (measure:digit core pr depth)))
+     (define vm (as vpr (measure:ft core m (add1 depth))))
+     (cond
+       [(p vpr)
+        ;; Split point is in left digit
+        (define-values (l x r) (split-digit core p i pr depth))
+        (values (maybe-digit->tree core l depth)
+                x
+                (deep-L core r m sf depth))]
+       [(p vm)
+        ;; Split point is in middle (inner tree)
+        (define-values (ml xs mr) (split:impl core p m (add1 depth)))
+        ;; xs is a node, split it further
+        (define ml-measure (as vpr (measure:ft core ml (add1 depth))))
+        (define-values (l x r) (split-node core p ml-measure xs depth))
+        (values (deep-R core pr ml l depth)
+                x
+                (deep-L core r mr sf depth))]
+       [else
+        ;; Split point is in right digit
+        (define-values (l x r) (split-digit core p vm sf depth))
+        (values (deep-R core pr m l depth)
+                x
+                (maybe-digit->tree core r depth))])]))
+
+;; Split a digit, returns (values left-list elem right-list)
+;; where left-list and right-list are lists of elements (possibly empty)
+(define (split-digit core p i digit depth)
+  (match-define (ft:config _ _ as) core)
+  (define lst (digit->list digit))
+  (let loop ([acc i] [before '()] [remaining lst])
+    (match remaining
+      [(cons x rest)
+       (define acc+ (as acc (measure:node core x depth)))
+       (if (p acc+)
+           (values (reverse before) x rest)
+           (loop acc+ (cons x before) rest))]
+      ['()
+       (error 'split-digit "predicate never became true")])))
+
+;; Split a node (at depth, node contains elements at depth)
+(define (split-node core p i node depth)
+  (match-define (ft:config _ _ as) core)
+  (match node
+    [(node:2 _ a b)
+     (define va (as i (measure:node core a depth)))
+     (if (p va)
+         (values '() a (list b))
+         (values (list a) b '()))]
+    [(node:3 _ a b c)
+     (define va (as i (measure:node core a depth)))
+     (cond
+       [(p va)
+        (values '() a (list b c))]
+       [else
+        (define vb (as va (measure:node core b depth)))
+        (if (p vb)
+            (values (list a) b (list c))
+            (values (list a b) c '()))])]))
+
+;; Convert possibly-empty list to tree
+(define (maybe-digit->tree core lst depth)
+  (match lst
+    ['() (ft:empty)]
+    [(list a) (ft:single a)]
+    [(list a b)
+     (match-define (ft:config _ _ as) core)
+     (ft:deep (as (measure:node core a depth) (measure:node core b depth))
+              (digit:1 a) (ft:empty) (digit:1 b))]
+    [(list a b c)
+     (match-define (ft:config _ _ as) core)
+     (ft:deep (as (measure:node core a depth) (as (measure:node core b depth) (measure:node core c depth)))
+              (digit:2 a b) (ft:empty) (digit:1 c))]
+    [(list a b c d)
+     (match-define (ft:config _ _ as) core)
+     (ft:deep (as (as (measure:node core a depth) (measure:node core b depth))
+                  (as (measure:node core c depth) (measure:node core d depth)))
+              (digit:2 a b) (ft:empty) (digit:2 c d))]))
+
+;; deep-L: construct tree with possibly empty left part
+(define (deep-L core l m sf depth)
+  (match l
+    ['()
+     (match m
+       [(ft:empty) (maybe-digit->tree core (digit->list sf) depth)]
+       [_
+        (define-values (node m-rest) (hdL:impl core m (add1 depth)))
+        (match-define (ft:config _ _ as) core)
+        (define new-left (node->digit node))
+        (ft:deep (as (measure:digit core new-left depth)
+                     (as (measure:ft core m-rest (add1 depth))
+                         (measure:digit core sf depth)))
+                 new-left m-rest sf)])]
+    [_
+     (define new-left (build-digit-from-list l))
+     (match-define (ft:config _ _ as) core)
+     (ft:deep (as (measure:digit core new-left depth)
+                  (as (measure:ft core m (add1 depth))
+                      (measure:digit core sf depth)))
+              new-left m sf)]))
+
+;; deep-R: construct tree with possibly empty right part
+(define (deep-R core pr m r depth)
+  (match r
+    ['()
+     (match m
+       [(ft:empty) (maybe-digit->tree core (digit->list pr) depth)]
+       [_
+        (define-values (node m-rest) (hdR:impl core m (add1 depth)))
+        (match-define (ft:config _ _ as) core)
+        (define new-right (node->digit node))
+        (ft:deep (as (measure:digit core pr depth)
+                     (as (measure:ft core m-rest (add1 depth))
+                         (measure:digit core new-right depth)))
+                 pr m-rest new-right)])]
+    [_
+     (define new-right (build-digit-from-list r))
+     (match-define (ft:config _ _ as) core)
+     (ft:deep (as (measure:digit core pr depth)
+                  (as (measure:ft core m (add1 depth))
+                      (measure:digit core new-right depth)))
+              pr m new-right)]))
+
+;; node->digit helper
+(define (node->digit node)
+  (match node
+    [(node:2 _ a b) (digit:2 a b)]
+    [(node:3 _ a b c) (digit:3 a b c)]))
+
 (provide measure:node measure:ft measure:digit)
-(provide consL:impl consR:impl hdL:impl hdR:impl concat:impl)
+(provide consL:impl consR:impl hdL:impl hdR:impl concat:impl split:impl)
+(provide deep-L deep-R maybe-digit->tree)
 (provide digit-add-list digit->list)
 (provide hdL-view hdR-view)
 (provide build-node2 build-node3)
