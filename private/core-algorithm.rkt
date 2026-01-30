@@ -142,7 +142,7 @@
         [(node:2 v b c) (values v (digit:2 b c))]
         [(node:3 v b c d) (values v (digit:3 b c d))]
         ))
-      (values a (ft:deep (as left-v (as (measure:ft core inner (add1 depth)) (measure:digit core right depth)))
+      (values a (ft:deep (as left-v (as (measure:ft core inner^ (add1 depth)) (measure:digit core right depth)))
         left-digit
         inner^
         right
@@ -214,7 +214,7 @@
         [(node:2 v b c) (values v (digit:2 b c))]
         [(node:3 v b c d) (values v (digit:3 b c d))]
         ))
-      (values a (ft:deep (as (measure:digit core left depth) (as (measure:ft core inner (add1 depth)) right-v))
+      (values a (ft:deep (as (measure:digit core left depth) (as (measure:ft core inner^ (add1 depth)) right-v))
         left
         inner^
         right-digit
