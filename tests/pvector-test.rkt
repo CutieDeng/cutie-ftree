@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require rackunit)
+(require rackunit racket/list racket/match racket/random)
 (require "../pvector.rkt")
 
 ;; ========================================
@@ -145,3 +145,77 @@
   (check-equal? (pvector-length pv) 1000)
   (for ([i (in-range 1000)])
     (check-equal? (pvector-ref pv i) i)))
+
+(define (list-set* xs idx value)
+  (append (take xs idx) (list value) (drop xs (add1 idx))))
+
+(define (apply-list-op xs op)
+  (match op
+    [(list 'noop) xs]
+    [(list 'cons-right value) (append xs (list value))]
+    [(list 'cons-left value) (cons value xs)]
+    [(list 'insert idx value) (append (take xs idx) (list value) (drop xs idx))]
+    [(list 'set idx value) (list-set* xs idx value)]
+    [(list 'delete idx) (append (take xs idx) (drop xs (add1 idx)))]))
+
+(define (apply-pvector-op pv op)
+  (match op
+    [(list 'noop) pv]
+    [(list 'cons-right value) (pvector-cons-right pv value)]
+    [(list 'cons-left value) (pvector-cons-left pv value)]
+    [(list 'insert idx value) (pvector-insert pv idx value)]
+    [(list 'set idx value) (pvector-set pv idx value)]
+    [(list 'delete idx)
+      (define-values (pv^ _) (pvector-delete pv idx))
+      pv^]))
+
+(define (generate-seeded-pvector-ops seed steps)
+  (random-seed seed)
+  (let loop ([step 0] [xs '()] [ops '()])
+    (cond
+      [(= step steps) (reverse ops)]
+      [else
+       (define len (length xs))
+       (define choice (random 8))
+       (define op
+         (cond
+           [(or (= choice 0) (= choice 1))
+            (list 'cons-right (random 1000))]
+           [(= choice 2)
+            (list 'cons-left (random 1000))]
+           [(and (= choice 3) (> len 0))
+            (list 'set (random len) (random 1000))]
+           [(and (= choice 4) (> len 0))
+            (list 'delete (random len))]
+           [(= choice 5)
+            (list 'insert (if (= len 0) 0 (random (add1 len))) (random 1000))]
+           [else '(noop)]))
+       (loop (add1 step) (apply-list-op xs op) (cons op ops))]
+      ) ; cond: step
+    ) ; let loop
+  ) ; define generate-seeded-pvector-ops
+
+(test-case "seeded mixed operations regression"
+  ;; 回归覆盖：
+  ;; 1. 中间子树 insert 后 node:3 重建使用了错误子节点。
+  ;; 2. split 右侧分支错误复用了右残片，delete 会重复元素。
+  ;; 3. split 中 node 回填左右树时漏传 depth，导致高层 measure 失真。
+  (define ops (generate-seeded-pvector-ops 20260328 200))
+  (let loop ([remaining ops] [pv (pvector-empty)] [xs '()] [step 0])
+    (cond
+      [(null? remaining) (void)]
+      [else
+       (define op (car remaining))
+       (define pv^ (apply-pvector-op pv op))
+       (define xs^ (apply-list-op xs op))
+       (check-equal? (pvector->list pv^) xs^)
+       (check-equal? (pvector-length pv^) (length xs^))
+       (for ([i (in-range (length xs^))])
+         (check-equal?
+          (pvector-ref pv^ i)
+          (list-ref xs^ i)
+          (format "step ~a index ~a op ~s" step i op)))
+       (loop (cdr remaining) pv^ xs^ (add1 step))]
+      ) ; cond: remaining
+    ) ; let loop
+  ) ; test-case seeded mixed operations regression

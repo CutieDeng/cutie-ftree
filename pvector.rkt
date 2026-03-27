@@ -251,7 +251,11 @@
 
 (define (digit-list+ft->digit lst ft depth pop)
   (match lst
-    ['() (define-values (h ft^) (pop core/size ft (add1 depth))) (values (digit:1 h) ft^)]
+    ['()
+      (define-values (h ft^) (pop core/size ft (add1 depth)))
+      ;; 从 inner finger tree 弹出的是更深一层的 node，
+      ;; 必须先展开成当前 depth 对应的 digit，不能把 node 直接塞进 digit。
+      (values (node->digit h (add1 depth)) ft^)]
     [`(,a) (values (digit:1 a) ft)]
     [`(,a ,b) (values (digit:2 a b) ft)]
     [`(,a ,b ,c) (values (digit:3 a b c) ft)]
@@ -313,16 +317,35 @@
           (define left (left-digit+ft->ft lhs l depth))
           (define right (right-digit+ft->ft rhs r depth))
           (define-values (idx^ l^ m^ r^) (pvector-split-node:impl m rest-idx (add1 depth)))
-          (define left^ (for/fold ([init left]) ([i l^]) (consR:impl core/size init i)))
-          (define right^ (for/foldr ([init right]) ([i r^]) (consL:impl core/size init i)))
+          ;; l^ / r^ 中的元素是当前 depth 层的 node，
+          ;; 这里必须显式传入 depth，不能落回 consL/consR 的默认 0。
+          (define left^
+            (for/fold ([init left]) ([i l^])
+              (consR:impl core/size init i depth)))
+          (define right^
+            (for/foldr ([init right]) ([i r^])
+              (consL:impl core/size init i depth)))
           (values idx^ left^ m^ right^)]
-        [(< idx v) (define-values (idx^ l m r) (pvector-split-digit:impl rhs (- idx inner-measure) depth))
+        [(< idx v)
+          (define-values (idx^ l m r)
+            (pvector-split-digit:impl rhs (- idx inner-measure) depth))
           (define right (digit-list->ft r depth))
           (match inner
-            [(ft:empty) (values idx^ (digit-list2->ft (append (digit-add-list lhs '()) l) depth) m right)]
+            [(ft:empty)
+             (values idx^
+                     (digit-list2->ft (append (digit-add-list lhs '()) l) depth)
+                     m
+                     right)]
             [_
-              (define-values (left inner^) (digit-list+ft->digit r inner depth hdR:impl))
-              (values idx^ (build-ft0 core/size lhs inner^ left depth) m right)])]
+             ;; 右 digit 被拆开后，左半边必须接上 l；
+             ;; 如果误用 r，会把右残片同时挂到左右两棵子树里。
+             (define-values (left inner^) (digit-list+ft->digit l inner depth hdR:impl))
+             (values idx^
+                     (build-ft0 core/size lhs inner^ left depth)
+                     m
+                     right)]
+            ) ; match: inner
+          ]
         [else (assert-unreachable)])]))
 
 (define (vector->node3vector vec start len depth)
@@ -482,41 +505,80 @@
 (define (pvector-insert-node:impl node idx value depth)
   (match depth
     [0 (values value node)]
-    [_ (match node
-      [(node:2 i x0 x1)
+    [_
+     (match node
+       [(node:2 i x0 x1)
         (define x0-size (measure:node core/size x0 (sub1 depth)))
         (cond
           [(<= x0-size idx)
-            (define-values (x1^ x2^) (pvector-insert-node:impl x1 (- idx x0-size) value (sub1 depth)))
-            (values (if x2^ (node:3 (add1 i) x0 x1^ x2^) (node:2 (add1 i) x0 x1^)) #f)]
+           (define-values (x1^ x2^)
+             (pvector-insert-node:impl x1 (- idx x0-size) value (sub1 depth)))
+           (values
+            (if x2^
+                (node:3 (add1 i) x0 x1^ x2^)
+                (node:2 (add1 i) x0 x1^))
+            #f)]
           [else
-            (define-values (x0^ x1^) (pvector-insert-node:impl x0 idx value (sub1 depth)))
-            (values (if x1^ (node:3 (add1 i) x0^ x1^ x1) (node:2 (add1 i) x0^ x1)) #f)])]
-      [(node:3 i x0 x1 x2)
+           (define-values (x0^ x1^)
+             (pvector-insert-node:impl x0 idx value (sub1 depth)))
+           (values
+            (if x1^
+                (node:3 (add1 i) x0^ x1^ x1)
+                (node:2 (add1 i) x0^ x1))
+            #f)]
+          ) ; cond: node:2
+        ] ; match: node:2
+       [(node:3 i x0 x1 x2)
         (define x0-size (measure:node core/size x0 (sub1 depth)))
         (define x1-size (measure:node core/size x1 (sub1 depth)))
         (define x0-x1-size (+ x0-size x1-size))
         (cond
           [(<= x0-x1-size idx)
-            (define-values (x2^ x3^)
-              (pvector-insert-node:impl x2 (- idx x0-x1-size) value (sub1 depth)))
-            (if x3^ (values (node:2 x0-x1-size x0 x1) (node:2 (+
-                (measure:node core/size x2^ (sub1 depth)) (measure:node core/size x3^ (sub1 depth)))
-                x2^ x3^))
-              (values (node:3 (+ i 1) x0 x1 x2^) #f))]
+           (define-values (x2^ x3^)
+             (pvector-insert-node:impl x2 (- idx x0-x1-size) value (sub1 depth)))
+           (if x3^
+               (values
+                (node:2 x0-x1-size x0 x1)
+                (node:2 (+ (measure:node core/size x2^ (sub1 depth))
+                           (measure:node core/size x3^ (sub1 depth)))
+                        x2^
+                        x3^))
+               (values (node:3 (+ i 1) x0 x1 x2^) #f))]
           [(<= x0-size idx)
-            (define-values (x1^ x2^)
-              (pvector-insert-node:impl x1 (- idx x0-size) value (sub1 depth)))
-            (if x2^ (values (node:2 (+ x0-size (measure:node core/size x1^ (sub1 depth))) x0 x1^)
-              (node:2 (+ (measure:node core/size x2^ (sub1 depth)) (measure:node core/size x2 (sub1 depth)))
-                x2^ x2))
-              (values (node:3 (+ i 1) x0 x1 x2^) #f))]
+           (define-values (x1^ x2^)
+             (pvector-insert-node:impl x1 (- idx x0-size) value (sub1 depth)))
+           (if x2^
+               (values
+                (node:2 (+ x0-size (measure:node core/size x1^ (sub1 depth)))
+                        x0
+                        x1^)
+                (node:2 (+ (measure:node core/size x2^ (sub1 depth))
+                           (measure:node core/size x2 (sub1 depth)))
+                        x2^
+                        x2))
+               ;; 中间子节点未分裂时，必须保留更新后的 x1^，
+               ;; 否则会把旧 x1 留下并污染右侧结构。
+               (values (node:3 (+ i 1) x0 x1^ x2) #f))]
           [else
-            (define-values (x0^ x1^) (pvector-insert-node:impl x0 idx value (sub1 depth)))
-            (if x1^ (values (node:2 (+ (measure:node core/size x0^ (sub1 depth)) (measure:node core/size x1^ (sub1 depth))) x0^ x1^)
-              (node:2 (+ (measure:node core/size x1 (sub1 depth)) (measure:node core/size x2 (sub1 depth)))
-                x1 x2))
-              (values (node:3 (+ i 1) x0^ x1 x2) #f))])])]))
+           (define-values (x0^ x1^)
+             (pvector-insert-node:impl x0 idx value (sub1 depth)))
+           (if x1^
+               (values
+                (node:2 (+ (measure:node core/size x0^ (sub1 depth))
+                           (measure:node core/size x1^ (sub1 depth)))
+                        x0^
+                        x1^)
+                (node:2 (+ (measure:node core/size x1 (sub1 depth))
+                           (measure:node core/size x2 (sub1 depth)))
+                        x1
+                        x2))
+               (values (node:3 (+ i 1) x0^ x1 x2) #f))]
+          ) ; cond: node:3
+        ] ; match: node:3
+       ) ; match node
+     ] ; match depth > 0
+    ) ; match depth
+  ) ; define pvector-insert-node:impl
 
 (define (pvector-insert ft idx value)
   (define ft-size (measure:ft core/size ft 0))
