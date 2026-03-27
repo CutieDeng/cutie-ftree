@@ -77,7 +77,11 @@
                        (consR:impl interval-config l interval 0)
                        (consL:impl interval-config r elem 0)
                        0))
-        (interval-tree new-ft (add1 cnt))])]))
+        (interval-tree new-ft (add1 cnt))]
+       ) ; cond: fast path / split path
+     ]
+    ) ; cond: empty tree
+  ) ; define interval-tree-insert
 
 (define (ft-measure ft)
   (match ft
@@ -117,9 +121,13 @@
        [(< max-hi qlo) acc]  ; no interval can overlap
        [(> min-lo qhi) acc]  ; all intervals start after query end
        [else
-        (define acc1 (search-digit left qlo qhi depth acc))
-        (define acc2 (search-ft inner qlo qhi (add1 depth) acc1))
-        (search-digit right qlo qhi depth acc2)])]))
+       (define acc1 (search-digit left qlo qhi depth acc))
+       (define acc2 (search-ft inner qlo qhi (add1 depth) acc1))
+        (search-digit right qlo qhi depth acc2)]
+       ) ; cond: pruning
+     ]
+    ) ; match: ft
+  ) ; define search-ft
 
 (define (search-digit digit qlo qhi depth acc)
   (digit-fold-left digit acc
@@ -138,7 +146,9 @@
        [(> min-lo qhi) acc]
        [else
         (define acc1 (search-child a qlo qhi depth acc))
-        (search-child b qlo qhi depth acc1)])]
+        (search-child b qlo qhi depth acc1)]
+       ) ; cond: node:2
+     ]
     [(node:3 (cons min-lo max-hi) a b c)
      (cond
        [(< max-hi qlo) acc]
@@ -146,7 +156,11 @@
        [else
         (define acc1 (search-child a qlo qhi depth acc))
         (define acc2 (search-child b qlo qhi depth acc1))
-        (search-child c qlo qhi depth acc2)])]))
+        (search-child c qlo qhi depth acc2)]
+       ) ; cond: node:3
+     ]
+    ) ; match: node
+  ) ; define search-node
 
 (define (search-child child qlo qhi depth acc)
   (if (= depth 1)
@@ -180,7 +194,9 @@
      (define new-ft (delete-by-double-split ft target))
      (if new-ft
          (interval-tree new-ft (sub1 cnt))
-         it)]))
+         it)]
+    ) ; cond: empty tree
+  ) ; define interval-tree-delete
 
 (define (delete-by-double-split ft target)
   (define target-lo (car target))
@@ -241,7 +257,13 @@
                #f)]
           [else
            ;; All intervals in le-part have lo < target-lo, target not found
-           #f])])]))
+           #f]
+          ) ; cond: split le-part
+        ]
+      ) ; cond: has-greater
+    ]
+   ) ; cond: empty / min-lo guards
+  ) ; define delete-by-double-split
 
 ;; Delete exact target from a tree where all elements have the same lo
 ;; Returns new tree or #f if not found
@@ -257,10 +279,14 @@
        [(equal? first target) rest]
        [(not (= (car first) (car target))) #f]  ; different lo, stop
        [else
-        (define new-rest (delete-exact-from-list rest target))
-        (if new-rest
-            (consL:impl interval-config new-rest first 0)
-            #f)])]))
+       (define new-rest (delete-exact-from-list rest target))
+       (if new-rest
+           (consL:impl interval-config new-rest first 0)
+           #f)]
+      ) ; cond: first element check
+    ]
+   ) ; match: ft
+  ) ; define delete-exact-from-list
 
 ;; Delete target from suffix, prepend before-part
 (define (delete-in-suffix suffix target before-part)
@@ -302,7 +328,9 @@
     [(ft:deep _ left inner right)
      (define acc1 (digit->list-acc left depth acc))
      (define acc2 (ft->list-acc inner (add1 depth) acc1))
-     (digit->list-acc right depth acc2)]))
+     (digit->list-acc right depth acc2)]
+    ) ; match: ft
+  ) ; define ft->list-acc
 
 (define (digit->list-acc digit depth acc)
   (digit-fold-left digit acc
@@ -323,7 +351,9 @@
          (cons c (cons b (cons a acc)))
          (node->list-acc c (sub1 depth)
                          (node->list-acc b (sub1 depth)
-                                         (node->list-acc a (sub1 depth) acc))))]))
+                                         (node->list-acc a (sub1 depth) acc))))]
+    ) ; match: node
+  ) ; define node->list-acc
 
 ;; ========================================
 ;; Exports

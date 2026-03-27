@@ -5,20 +5,22 @@
 (define (measure:node f n depth)
   (match depth
     [0 (match-define (ft:config _ m _) f) (m n)]
-    [_ (match n
+    [_
+     (match n
         [(node:2 v _ _) v]
         [(node:3 v _ _ _) v]
-      )]
-  )
-)
+        ) ; match: n
+     ]
+    ) ; match: depth
+  ) ; define measure:node
 
 (define (measure:ft f ft depth)
   (match ft
     [(ft:deep v _ _ _) v]
     [(ft:single a) (measure:node f a depth)]
     [(ft:empty) (match-define (ft:config e _ _) f) (e)]
-  )
-)
+    ) ; match: ft
+  ) ; define measure:ft
 
 (define (measure:digit f d depth)
   (match-define (ft:config _ _ as) f)
@@ -32,8 +34,8 @@
     [(digit:4 a b c d)
       (as (as (measure:node f a depth) (measure:node f b depth))
         (as (measure:node f c depth) (measure:node f d depth)))]
-  )
-)
+    ) ; match: d
+  ) ; define measure:digit
 
 (define (consL:impl core ft v [depth 0])
   (match ft
@@ -64,10 +66,10 @@
           ))
           (ft:deep v^^ left^ inner right)
         ]
-      )
+        ) ; match: left
     ]
-  )
-)
+    ) ; match: ft
+  ) ; define consL:impl
 
 (define (consR:impl core ft v [depth 0])
   (match ft
@@ -98,10 +100,10 @@
           ))
           (ft:deep v^^ left inner right^)
         ]
-      )
+        ) ; match: right
     ]
-  )
-)
+    ) ; match: ft
+  ) ; define consR:impl
 
 (define (hdL:impl core ft [depth 0])
   (match ft
@@ -141,30 +143,36 @@
       (define-values (left-v left-digit) (match lhs
         [(node:2 v b c) (values v (digit:2 b c))]
         [(node:3 v b c d) (values v (digit:3 b c d))]
-        ))
-      (values a (ft:deep (as left-v (as (measure:ft core inner^ (add1 depth)) (measure:digit core right depth)))
+        )) ; match: lhs
+      (values
+       a
+       (ft:deep
+        (as left-v
+            (as (measure:ft core inner^ (add1 depth))
+                (measure:digit core right depth)))
         left-digit
         inner^
-        right
-      ))
+        right))
     ]
     [(ft:deep _ left inner right)
       (define-values (h lhs^) (match left
         [(digit:2 a b) (values a (digit:1 b))]
         [(digit:3 a b c) (values a (digit:2 b c))]
         [(digit:4 a b c d) (values a (digit:3 b c d))]
-      ))
+      )) ; match: left
       (match-define (ft:config _ _ as) core)
-      (values h (ft:deep
-        (as (measure:digit core lhs^ depth) (as (measure:ft core inner (+ depth 1))
-          (measure:digit core right depth)))
+      (values
+       h
+       (ft:deep
+        (as (measure:digit core lhs^ depth)
+            (as (measure:ft core inner (+ depth 1))
+                (measure:digit core right depth)))
         lhs^
         inner
-        right
-      ))
+        right))
     ]
-  )
-)
+    ) ; match: ft
+  ) ; define hdL:impl
 
 (define (debug:getMaxDepth:impl core ft [depth 0])
   (match ft
@@ -172,8 +180,8 @@
       (debug:getMaxDepth:impl core inner (+ depth 1))
     ]
     [(or (ft:empty) (ft:single _)) depth]
-  )
-)
+    ) ; match: ft
+  ) ; define debug:getMaxDepth:impl
 
 (define (hdR:impl core ft [depth 0])
   (match ft
@@ -213,30 +221,35 @@
       (define-values (right-v right-digit) (match rhs
         [(node:2 v b c) (values v (digit:2 b c))]
         [(node:3 v b c d) (values v (digit:3 b c d))]
-        ))
-      (values a (ft:deep (as (measure:digit core left depth) (as (measure:ft core inner^ (add1 depth)) right-v))
+        )) ; match: rhs
+      (values
+       a
+       (ft:deep
+        (as (measure:digit core left depth)
+            (as (measure:ft core inner^ (add1 depth)) right-v))
         left
         inner^
-        right-digit
-      ))
+        right-digit))
     ]
     [(ft:deep _ lhs inner right)
       (define-values (h rhs^) (match right
         [(digit:2 a b) (values b (digit:1 a))]
         [(digit:3 a b c) (values c (digit:2 a b))]
         [(digit:4 a b c d) (values d (digit:3 a b c))]
-      ))
+      )) ; match: right
       (match-define (ft:config _ _ as) core)
-      (values h (ft:deep
-        (as (as (measure:digit core lhs depth) (measure:ft core inner (+ depth 1)))
-          (measure:digit core rhs^ depth))
+      (values
+       h
+       (ft:deep
+        (as (as (measure:digit core lhs depth)
+                (measure:ft core inner (+ depth 1)))
+            (measure:digit core rhs^ depth))
         lhs
         inner
-        rhs^
-      ))
+        rhs^))
     ]
-  )
-)
+    ) ; match: ft
+  ) ; define hdR:impl
 
 (define (digit-add-list digit rest)
   (match digit
@@ -261,21 +274,35 @@
 (define (list->nodes:impl core rest depth)
   (match-define (ft:config _ _ as) core)
   (match rest
-    [`(,a ,b ,c ,d) (list
+    [`(,a ,b ,c ,d)
+     (list
       (node:2 (as (measure:node core a depth) (measure:node core b depth)) a b)
       (node:2 (as (measure:node core c depth) (measure:node core d depth)) c d))]
-    [`(,a ,b ,c) (list (node:3
-      (as (measure:node core a depth) (as (measure:node core b depth) (measure:node core c depth)))
-      a b c))]
-    [`(,a ,b) (list (node:2
-      (as (measure:node core a depth) (measure:node core b depth))
-      a b))]
+    [`(,a ,b ,c)
+     (list
+      (node:3
+       (as (measure:node core a depth)
+           (as (measure:node core b depth) (measure:node core c depth)))
+       a
+       b
+       c))]
+    [`(,a ,b)
+     (list
+      (node:2
+       (as (measure:node core a depth) (measure:node core b depth))
+       a
+       b))]
     [`(,a ,b ,c ,r ...)
       (cons
-        (node:3 (as (measure:node core a depth) (as (measure:node core b depth) (measure:node core c depth))) a b c)
+        (node:3
+         (as (measure:node core a depth)
+             (as (measure:node core b depth) (measure:node core c depth)))
+         a
+         b
+         c)
         (list->nodes:impl core r depth))]
-  )
-)
+    ) ; match: rest
+  ) ; define list->nodes:impl
 
 (define (concat:impl core lhs rhs [depth 0])
   (match* (lhs rhs)
@@ -287,16 +314,16 @@
       (define mid (digit-add-list lhs-right (digit-add-list rhs-left '())))
       (define mid^ (list->nodes:impl core mid depth))
       ;; mid^ contains nodes at depth+1, so consR into inner at depth+1
-      (define left-inner^ (for/fold ([i lhs-inner]) ([m mid^])
-        (consR:impl core i m (add1 depth))
-      ))
+      (define left-inner^
+        (for/fold ([i lhs-inner]) ([m mid^])
+          (consR:impl core i m (add1 depth))))
       (define inner^ (concat:impl core left-inner^ rhs-inner (add1 depth)))
       (match-define (ft:config _ _ as) core)
       (define v^ (as lhs-v rhs-v))
       (ft:deep v^ lhs-left inner^ rhs-right)
     ]
-  )
-)
+    ) ; match*: lhs rhs
+  ) ; define concat:impl
 
 (define (build-ft0 core lhs inner rhs depth)
   (match-define (ft:config _ _ as) core)
@@ -304,8 +331,7 @@
   (define mid (measure:ft core inner (add1 depth)))
   (define rhs-measure (measure:digit core rhs depth))
   (define v (as lhs-measure (as mid rhs-measure)))
-  (ft:deep v lhs inner rhs)
-)
+  (ft:deep v lhs inner rhs)) ; define build-ft0
 
 (define (hdL-view ft)
   (match ft
@@ -346,16 +372,15 @@
 
 (define (build-node3 core x0 x1 x2 depth)
   (match-define (ft:config _ _ as) core)
-  (define c (as (as (measure:node core x0 depth) (measure:node core x1 depth))
-    (measure:node core x2 depth)))
-  (node:3 c x0 x1 x2)
-)
+  (define c
+    (as (as (measure:node core x0 depth) (measure:node core x1 depth))
+        (measure:node core x2 depth)))
+  (node:3 c x0 x1 x2)) ; define build-node3
 
 (define (build-node2 core x0 x1 depth)
   (match-define (ft:config _ _ as) core)
-  (define c (as (measure:node core x0 depth) (measure:node core x1 depth)) )
-  (node:2 c x0 x1)
-)
+  (define c (as (measure:node core x0 depth) (measure:node core x1 depth)))
+  (node:2 c x0 x1)) ; define build-node2
 
 ;; ========================================
 ;; Zero-allocation digit iteration API

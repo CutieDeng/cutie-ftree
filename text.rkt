@@ -301,18 +301,28 @@
       (let ([v (for/fold ([m (text-measure-empty)]) ([j lst])
                  (text-measure-append m (measure:node text-core j depth)))])
         (match lst
-          [(list a b c d e) (ft:deep v (digit:2 a b) (ft:empty) (digit:3 c d e))]
-          [(list a b c d e f) (ft:deep v (digit:3 a b c) (ft:empty) (digit:3 d e f))]
-          [(list a b c d e f g) (ft:deep v (digit:3 a b c) (ft:empty) (digit:4 d e f g))]))))
+          [(list a b c d e)
+           (ft:deep v (digit:2 a b) (ft:empty) (digit:3 c d e))]
+          [(list a b c d e f)
+           (ft:deep v (digit:3 a b c) (ft:empty) (digit:3 d e f))]
+          [(list a b c d e f g)
+           (ft:deep v (digit:3 a b c) (ft:empty) (digit:4 d e f g))]
+          ) ; match: lst
+        ) ; let: v
+      ) ; if: digit-list2->ft
+  ) ; define digit-list2->ft
 
 (define (digit-list+ft->digit lst ft depth pop)
   (match lst
-    ['() (define-values (h ft^) (pop text-core ft (add1 depth)))
+    ['()
+      (define-values (h ft^) (pop text-core ft (add1 depth)))
       (values (digit:1 h) ft^)]
     [(list a) (values (digit:1 a) ft)]
     [(list a b) (values (digit:2 a b) ft)]
     [(list a b c) (values (digit:3 a b c) ft)]
-    [(list a b c d) (values (digit:4 a b c d) ft)]))
+    [(list a b c d) (values (digit:4 a b c d) ft)]
+    ) ; match: lst
+  ) ; define digit-list+ft->digit
 
 (define (node->digit node depth)
   (list->digit (node->list node) (sub1 depth)))
@@ -320,61 +330,87 @@
 (define (left-digit+ft->ft digit ft depth)
   (match ft
     [(ft:empty)
-      (define digit^ (digit-add-list digit '()))
-      (digit-list->ft digit^ depth)]
-    [_ (define-values (r ft^) (hdR:impl text-core ft (add1 depth)))
-      (build-ft0 text-core digit ft^ (node->digit r (add1 depth)) depth)]))
+     (define digit^ (digit-add-list digit '()))
+     (digit-list->ft digit^ depth)]
+    [_
+     (define-values (r ft^) (hdR:impl text-core ft (add1 depth)))
+     (build-ft0 text-core digit ft^ (node->digit r (add1 depth)) depth)]
+    ) ; match: ft
+  ) ; define left-digit+ft->ft
 
 (define (right-digit+ft->ft digit ft depth)
   (match ft
     [(ft:empty)
-      (define digit^ (digit-add-list digit '()))
-      (digit-list->ft digit^ depth)]
-    [_ (define-values (l ft^) (hdL:impl text-core ft (add1 depth)))
-      (build-ft0 text-core (node->digit l (add1 depth)) ft^ digit depth)]))
+     (define digit^ (digit-add-list digit '()))
+     (digit-list->ft digit^ depth)]
+    [_
+     (define-values (l ft^) (hdL:impl text-core ft (add1 depth)))
+     (build-ft0 text-core (node->digit l (add1 depth)) ft^ digit depth)]
+    ) ; match: ft
+  ) ; define right-digit+ft->ft
 
 ;; Main split implementation
 (define (text-split-ft:impl ft idx depth)
   (match ft
     [(ft:empty) (error 'text-split "index out of bounds")]
     [(ft:single v)
-      (define m (text-measure-chars (measure:node text-core v depth)))
-      (cond
-        [(>= idx m) (error 'text-split "index out of bounds")]
-        [else (values idx (ft:empty) v (ft:empty))])]
+     (define m (text-measure-chars (measure:node text-core v depth)))
+     (cond
+       [(>= idx m) (error 'text-split "index out of bounds")]
+       [else (values idx (ft:empty) v (ft:empty))]
+       ) ; cond: ft:single
+     ]
     [(ft:deep _ lhs inner rhs)
-      (define lhs-measure (text-measure-chars (measure:digit text-core lhs depth)))
-      (define inner-measure (+ lhs-measure (text-measure-chars (measure:ft text-core inner (add1 depth)))))
-      (cond
-        [(< idx lhs-measure)
-          (define-values (idx^ l m r) (text-split-digit:impl lhs idx depth))
-          (define left (digit-list->ft l depth))
-          (match inner
-            [(ft:empty) (values idx^ left m (digit-list2->ft (append r (digit-add-list rhs '())) depth))]
-            [_
-              (define-values (right inner^) (digit-list+ft->digit r inner depth hdL:impl))
-              (values idx^ left m (build-ft0 text-core right inner^ rhs depth))])]
-        [(< idx inner-measure)
-          (define-values (rest-idx l m r) (text-split-ft:impl inner (- idx lhs-measure) (add1 depth)))
-          (define left (left-digit+ft->ft lhs l depth))
-          (define right (right-digit+ft->ft rhs r depth))
-          (define-values (idx^ l^ m^ r^) (text-split-node:impl m rest-idx (add1 depth)))
-          ;; l^ and r^ are elements at depth (from the node at depth+1)
-          (define left^ (for/fold ([init left]) ([i l^]) (consR:impl text-core init i depth)))
-          (define right^ (for/foldr ([init right]) ([i r^]) (consL:impl text-core init i depth)))
-          (values idx^ left^ m^ right^)]
-        [else
-          (define v (text-measure-chars (measure:ft text-core ft depth)))
-          (cond
-            [(>= idx v) (error 'text-split "index out of bounds")]
-            [else
-              (define-values (idx^ l m r) (text-split-digit:impl rhs (- idx inner-measure) depth))
-              (define right (digit-list->ft r depth))
-              (match inner
-                [(ft:empty) (values idx^ (digit-list2->ft (append (digit-add-list lhs '()) l) depth) m right)]
-                [_
-                  (define-values (left inner^) (digit-list+ft->digit l inner depth hdR:impl))
-                  (values idx^ (build-ft0 text-core lhs inner^ left depth) m right)])])])]))
+     (define lhs-measure (text-measure-chars (measure:digit text-core lhs depth)))
+     (define inner-measure
+       (+ lhs-measure (text-measure-chars (measure:ft text-core inner (add1 depth)))))
+     (cond
+       [(< idx lhs-measure)
+        (define-values (idx^ l m r) (text-split-digit:impl lhs idx depth))
+        (define left (digit-list->ft l depth))
+        (match inner
+          [(ft:empty)
+           (values idx^ left m (digit-list2->ft (append r (digit-add-list rhs '())) depth))]
+          [_
+           (define-values (right inner^) (digit-list+ft->digit r inner depth hdL:impl))
+           (values idx^ left m (build-ft0 text-core right inner^ rhs depth))]
+          ) ; match: inner after lhs split
+        ]
+       [(< idx inner-measure)
+        (define-values (rest-idx l m r)
+          (text-split-ft:impl inner (- idx lhs-measure) (add1 depth)))
+        (define left (left-digit+ft->ft lhs l depth))
+        (define right (right-digit+ft->ft rhs r depth))
+        (define-values (idx^ l^ m^ r^) (text-split-node:impl m rest-idx (add1 depth)))
+        ;; l^ and r^ are elements at depth (from the node at depth+1)
+        (define left^
+          (for/fold ([init left]) ([i l^])
+            (consR:impl text-core init i depth)))
+        (define right^
+          (for/foldr ([init right]) ([i r^])
+            (consL:impl text-core init i depth)))
+        (values idx^ left^ m^ right^)]
+       [else
+        (define v (text-measure-chars (measure:ft text-core ft depth)))
+        (cond
+          [(>= idx v) (error 'text-split "index out of bounds")]
+          [else
+           (define-values (idx^ l m r) (text-split-digit:impl rhs (- idx inner-measure) depth))
+           (define right (digit-list->ft r depth))
+           (match inner
+             [(ft:empty)
+              (values idx^ (digit-list2->ft (append (digit-add-list lhs '()) l) depth) m right)]
+             [_
+              (define-values (left inner^) (digit-list+ft->digit l inner depth hdR:impl))
+              (values idx^ (build-ft0 text-core lhs inner^ left depth) m right)]
+             ) ; match: inner after rhs split
+           ]
+          ) ; cond: rhs branch bounds
+        ]
+       ) ; cond: ft:deep
+     ]
+    ) ; match: ft
+  ) ; define text-split-ft:impl
 
 ;; Public split function
 (define (text-split-at tb pos)
@@ -552,30 +588,36 @@
 (define (find-nth-in-node node n depth measure-accessor flag-accessor char-offset)
   (match depth
     [0
-      ;; At leaf level - this should be the element we want
-      (if (and (= n 0) (flag-accessor node))
-          char-offset
-          (error 'find-nth-in-node "element not found"))]
+     ;; At leaf level - this should be the element we want
+     (if (and (= n 0) (flag-accessor node))
+         char-offset
+         (error 'find-nth-in-node "element not found"))]
     [_
-      (match node
+     (match node
         [(node:2 _ a b)
-          (define a-count (measure-accessor (measure:node text-core a (sub1 depth))))
-          (define a-chars (text-measure-chars (measure:node text-core a (sub1 depth))))
-          (if (< n a-count)
-              (find-nth-in-node a n (sub1 depth) measure-accessor flag-accessor char-offset)
-              (find-nth-in-node b (- n a-count) (sub1 depth) measure-accessor flag-accessor (+ char-offset a-chars)))]
+         (define a-count (measure-accessor (measure:node text-core a (sub1 depth))))
+         (define a-chars (text-measure-chars (measure:node text-core a (sub1 depth))))
+         (if (< n a-count)
+             (find-nth-in-node a n (sub1 depth) measure-accessor flag-accessor char-offset)
+             (find-nth-in-node b (- n a-count) (sub1 depth) measure-accessor flag-accessor (+ char-offset a-chars)))]
         [(node:3 _ a b c)
-          (define a-count (measure-accessor (measure:node text-core a (sub1 depth))))
-          (define b-count (measure-accessor (measure:node text-core b (sub1 depth))))
-          (define a-chars (text-measure-chars (measure:node text-core a (sub1 depth))))
-          (define b-chars (text-measure-chars (measure:node text-core b (sub1 depth))))
-          (cond
-            [(< n a-count)
-              (find-nth-in-node a n (sub1 depth) measure-accessor flag-accessor char-offset)]
-            [(< n (+ a-count b-count))
-              (find-nth-in-node b (- n a-count) (sub1 depth) measure-accessor flag-accessor (+ char-offset a-chars))]
-            [else
-              (find-nth-in-node c (- n a-count b-count) (sub1 depth) measure-accessor flag-accessor (+ char-offset a-chars b-chars))])])]))
+         (define a-count (measure-accessor (measure:node text-core a (sub1 depth))))
+         (define b-count (measure-accessor (measure:node text-core b (sub1 depth))))
+         (define a-chars (text-measure-chars (measure:node text-core a (sub1 depth))))
+         (define b-chars (text-measure-chars (measure:node text-core b (sub1 depth))))
+         (cond
+           [(< n a-count)
+            (find-nth-in-node a n (sub1 depth) measure-accessor flag-accessor char-offset)]
+           [(< n (+ a-count b-count))
+            (find-nth-in-node b (- n a-count) (sub1 depth) measure-accessor flag-accessor (+ char-offset a-chars))]
+           [else
+            (find-nth-in-node c (- n a-count b-count) (sub1 depth) measure-accessor flag-accessor (+ char-offset a-chars b-chars))]
+           ) ; cond: node:3
+         ]
+        ) ; match: node
+     ]
+    ) ; match: depth
+  ) ; define find-nth-in-node
 
 ;; Convert character position to word index
 (define (text-char-to-word tb char-pos)

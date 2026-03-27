@@ -300,9 +300,13 @@
                           (measure:digit core right depth)))
         (ft:deep new-v left inner^ right)]
        [else
-        ;; Insert in left digit
+       ;; Insert in left digit
         (define left-lst (seg-insert-digit core cfg left idx val depth))
-        (seg-handle-left-insert core left-lst inner right depth)])]))
+        (seg-handle-left-insert core left-lst inner right depth)]
+       ) ; cond: ft:deep
+     ]
+    ) ; match: ft
+  ) ; define seg-insert-ft
 
 ;; Insert into node, returns (values new-node maybe-split-node)
 (define (seg-insert-node core cfg node idx val depth)
@@ -320,11 +324,13 @@
                 (values (build-node3 core x0 x1^ x2^ (sub1 depth)) #f)
                 (values (build-node2 core x0 x1^ (sub1 depth)) #f))]
            [else
-            ;; Insert in x0
+           ;; Insert in x0
             (define-values (x0^ x1^) (seg-insert-node core cfg x0 idx val (sub1 depth)))
             (if x1^
                 (values (build-node3 core x0^ x1^ x1 (sub1 depth)) #f)
-                (values (build-node2 core x0^ x1 (sub1 depth)) #f))])]
+                (values (build-node2 core x0^ x1 (sub1 depth)) #f))]
+           ) ; cond: node:2
+         ]
         [(node:3 _ x0 x1 x2)
          (define x0-sz (car (seg-node-measure core x0 (sub1 depth))))
          (define x1-sz (car (seg-node-measure core x1 (sub1 depth))))
@@ -347,21 +353,28 @@
                         (build-node2 core x2^ x2 (sub1 depth)))
                 (values (build-node3 core x0 x1^ x2 (sub1 depth)) #f))]
            [else
-            ;; Insert in x0
+           ;; Insert in x0
             (define-values (x0^ x1^) (seg-insert-node core cfg x0 idx val (sub1 depth)))
             (if x1^
                 ;; Split: (x0^ x1^) and (x1 x2)
                 (values (build-node2 core x0^ x1^ (sub1 depth))
                         (build-node2 core x1 x2 (sub1 depth)))
-                (values (build-node3 core x0^ x1 x2 (sub1 depth)) #f))])])))
+                (values (build-node3 core x0^ x1 x2 (sub1 depth)) #f))]
+           ) ; cond: node:3
+         ]
+        ) ; match: node
+      ) ; if: depth
+  ) ; define seg-insert-node
 
 ;; Insert into digit, returns list of nodes (1-5 elements)
 (define (seg-insert-digit core cfg digit idx val depth)
-  (define nodes (match digit
-                  [(digit:1 a) (list a)]
-                  [(digit:2 a b) (list a b)]
-                  [(digit:3 a b c) (list a b c)]
-                  [(digit:4 a b c d) (list a b c d)]))
+  (define nodes
+    (match digit
+      [(digit:1 a) (list a)]
+      [(digit:2 a b) (list a b)]
+      [(digit:3 a b c) (list a b c)]
+      [(digit:4 a b c d) (list a b c d)]
+      )) ; match: digit
   (let loop ([ns nodes] [pos 0] [acc '()] [done #f])
     (match ns
       ['()
@@ -381,7 +394,14 @@
                 (define-values (n0 n1) (seg-insert-node core cfg n (- idx pos) val depth))
                 (if n1
                     (loop rest pos (cons n1 (cons n0 acc)) #t)
-                    (loop rest pos (cons n0 acc) #t))])))])))
+                    (loop rest pos (cons n0 acc) #t))]
+               ) ; cond: insert position
+             ) ; let: n-sz
+           ) ; if: done
+       ]
+      ) ; match: ns
+    ) ; let loop
+  ) ; define seg-insert-digit
 
 ;; Handle left digit insert result (possibly 5 nodes -> overflow)
 (define (seg-handle-left-insert core left-lst inner right depth)
@@ -603,7 +623,9 @@
            (values idx^ left m (seg-digit-list2->ft core (append r (seg-digit->list rhs)) depth))]
           [_
            (define-values (right-digit inner^) (seg-digit-list+ft->digit core r inner depth hdL:impl))
-           (values idx^ left m (build-ft0 core right-digit inner^ rhs depth))])]
+           (values idx^ left m (build-ft0 core right-digit inner^ rhs depth))]
+          ) ; match: inner after lhs split
+        ]
        [(< idx lhs-inner-sz)
         ;; Split in inner
         (define-values (rest-idx l-inner m-node r-inner)
@@ -613,8 +635,12 @@
         ;; Split the middle node
         (define-values (idx^ l^ m^ r^) (seg-split-node core m-node rest-idx (add1 depth)))
         ;; Append l^ to left, prepend r^ to right
-        (define left^ (for/fold ([t left]) ([n l^]) (consR:impl core t n depth)))
-        (define right^ (for/foldr ([t right]) ([n r^]) (consL:impl core t n depth)))
+        (define left^
+          (for/fold ([t left]) ([n l^])
+            (consR:impl core t n depth)))
+        (define right^
+          (for/foldr ([t right]) ([n r^])
+            (consL:impl core t n depth)))
         (values idx^ left^ m^ right^)]
        [(< idx (car total-measure))
         ;; Split in right digit
@@ -625,8 +651,14 @@
            (values idx^ (seg-digit-list2->ft core (append (seg-digit->list lhs) l) depth) m right)]
           [_
            (define-values (left-digit inner^) (seg-digit-list+ft->digit core l inner depth hdR:impl))
-           (values idx^ (build-ft0 core lhs inner^ left-digit depth) m right)])]
-       [else (error 'seg-split:impl "index out of bounds")])]))
+           (values idx^ (build-ft0 core lhs inner^ left-digit depth) m right)]
+          ) ; match: inner after rhs split
+        ]
+       [else (error 'seg-split:impl "index out of bounds")]
+       ) ; cond: ft:deep
+     ]
+    ) ; match: ft
+  ) ; define seg-split:impl
 
 ;; Public split: returns (left-ft, middle-elem, right-ft) at depth 0
 (define (seg-split core ft idx)
@@ -721,7 +753,9 @@
                              (- hi right-start)
                              depth)
            id))
-     (comb (comb left-contrib inner-contrib) right-contrib)]))
+     (comb (comb left-contrib inner-contrib) right-contrib)]
+    ) ; match: ft
+  ) ; define range-query-ft
 
 (define (range-query-digit cfg digit lo hi depth)
   (define comb (seg-config-combine cfg))
@@ -754,9 +788,11 @@
       ((seg-config-extract cfg) node)
       (let ([comb (seg-config-combine cfg)]
             [id (seg-config-identity cfg)])
-        (define children (match node
-                           [(node:2 _ a b) (list a b)]
-                           [(node:3 _ a b c) (list a b c)]))
+        (define children
+          (match node
+            [(node:2 _ a b) (list a b)]
+            [(node:3 _ a b c) (list a b c)]
+            )) ; match: node
         (define-values (result _)
           (for/fold ([acc id] [pos 0]) ([c children])
             (define c-sz (node-size cfg c (sub1 depth)))
@@ -773,7 +809,9 @@
                            (range-query-node cfg c (max 0 (- lo pos)) (min c-sz (- hi pos)) (sub1 depth))))
                  acc)
              c-end)))
-        result)))
+        result)
+    ) ; let: comb id
+  ) ; define range-query-node
 
 ;; ========================================
 ;; Concat

@@ -166,8 +166,10 @@
     [(list 'insert idx value) (pvector-insert pv idx value)]
     [(list 'set idx value) (pvector-set pv idx value)]
     [(list 'delete idx)
-      (define-values (pv^ _) (pvector-delete pv idx))
-      pv^]))
+     (define-values (pv^ _) (pvector-delete pv idx))
+     pv^]
+    ) ; match: op
+  ) ; define apply-pvector-op
 
 (define (generate-seeded-pvector-ops seed steps)
   (random-seed seed)

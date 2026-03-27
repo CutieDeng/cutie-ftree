@@ -242,12 +242,21 @@
       (digit:2 a b) (pvector-empty) (digit:2 c d))]))
 
 (define (digit-list2->ft lst depth)
-  (if (<= (length lst) 4) (digit-list->ft lst depth)
-    (let ([v (for/fold ([i 0]) ([j lst]) (+ i (measure:node core/size j depth)))])
-      (match lst
-        [`(,a ,b ,c ,d ,e) (ft:deep v (digit:2 a b) (ft:empty) (digit:3 c d e))]
-        [`(,a ,b ,c ,d ,e ,f) (ft:deep v (digit:3 a b c) (ft:empty) (digit:3 d e f))]
-        [`(,a ,b ,c ,d ,e ,f ,g) (ft:deep v (digit:3 a b c) (ft:empty) (digit:4 d e f g))]))))
+  (if (<= (length lst) 4)
+      (digit-list->ft lst depth)
+      (let ([v (for/fold ([i 0]) ([j lst])
+                 (+ i (measure:node core/size j depth)))])
+        (match lst
+          [`(,a ,b ,c ,d ,e)
+           (ft:deep v (digit:2 a b) (ft:empty) (digit:3 c d e))]
+          [`(,a ,b ,c ,d ,e ,f)
+           (ft:deep v (digit:3 a b c) (ft:empty) (digit:3 d e f))]
+          [`(,a ,b ,c ,d ,e ,f ,g)
+           (ft:deep v (digit:3 a b c) (ft:empty) (digit:4 d e f g))]
+          ) ; match: lst
+        ) ; let: v
+      ) ; if: digit-list2->ft
+  ) ; define digit-list2->ft
 
 (define (digit-list+ft->digit lst ft depth pop)
   (match lst
@@ -267,86 +276,120 @@
 (define (left-digit+ft->ft digit ft depth)
   (match ft
     [(ft:empty)
-      (define digit^ (digit-add-list digit '()))
-      (digit-list->ft digit^ depth)]
-    [_ (define-values (r ft^) (hdR:impl core/size ft (add1 depth)))
-      (build-ft0 core/size digit ft^ (node->digit r (add1 depth)) depth)]))
+     (define digit^ (digit-add-list digit '()))
+     (digit-list->ft digit^ depth)]
+    [_
+     (define-values (r ft^) (hdR:impl core/size ft (add1 depth)))
+     (build-ft0 core/size digit ft^ (node->digit r (add1 depth)) depth)]
+    ) ; match: ft
+  ) ; define left-digit+ft->ft
 
 (define (right-digit+ft->ft digit ft depth)
   (match ft
     [(ft:empty)
-      (define digit^ (digit-add-list digit '()))
-      (digit-list->ft digit^ depth)]
-    [_ (define-values (l ft^) (hdL:impl core/size ft (add1 depth)))
-      (build-ft0 core/size (node->digit l (add1 depth)) ft^ digit depth)]))
+     (define digit^ (digit-add-list digit '()))
+     (digit-list->ft digit^ depth)]
+    [_
+     (define-values (l ft^) (hdL:impl core/size ft (add1 depth)))
+     (build-ft0 core/size (node->digit l (add1 depth)) ft^ digit depth)]
+    ) ; match: ft
+  ) ; define right-digit+ft->ft
 
 (define (pvector-split-node:impl node idx depth)
   (match node
-    [(node:2 v a b) (cond
-      [(< idx (measure:node core/size a (sub1 depth))) (values idx `() a `(,b))]
-      [(< idx v) (values (- idx (measure:node core/size a (sub1 depth))) `(,a) b `())]
-      [else (assert-unreachable)])]
-    [(node:3 v a b c) (cond
-      [(< idx (measure:node core/size a (sub1 depth))) (values idx `() a `(,b ,c))]
-      [(< idx (+ (measure:node core/size a (sub1 depth)) (measure:node core/size b (sub1 depth))))
+    [(node:2 v a b)
+     (cond
+       [(< idx (measure:node core/size a (sub1 depth)))
+        (values idx `() a `(,b))]
+       [(< idx v)
+        (values (- idx (measure:node core/size a (sub1 depth))) `(,a) b `())]
+       [else (assert-unreachable)]
+       ) ; cond: node:2
+     ]
+    [(node:3 v a b c)
+     (cond
+       [(< idx (measure:node core/size a (sub1 depth)))
+        (values idx `() a `(,b ,c))]
+       [(< idx (+ (measure:node core/size a (sub1 depth))
+                  (measure:node core/size b (sub1 depth))))
         (values (- idx (measure:node core/size a (sub1 depth))) `(,a) b `(,c))]
-      [(< idx v) (values
-        (- idx (measure:node core/size a (sub1 depth)) (measure:node core/size b (sub1 depth)))
-        `(,a ,b) c `())])]))
+       [(< idx v)
+        (values
+         (- idx
+            (measure:node core/size a (sub1 depth))
+            (measure:node core/size b (sub1 depth)))
+         `(,a ,b)
+         c
+         `())]
+       ) ; cond: node:3
+     ]
+    ) ; match: node
+  ) ; define pvector-split-node:impl
 
 (define (pvector-split:impl pv idx depth)
   (match pv
     [(ft:empty) (assert-unreachable)]
     [(ft:single v)
-      (cond
-        [(>= idx (measure:node core/size v depth)) (assert-unreachable)]
-        [else (values idx (pvector-empty) v (pvector-empty))])]
+     (cond
+       [(>= idx (measure:node core/size v depth)) (assert-unreachable)]
+       [else (values idx (pvector-empty) v (pvector-empty))]
+       ) ; cond: ft:single
+     ]
     [(ft:deep v lhs inner rhs)
-      (define lhs-measure (measure:digit core/size lhs depth))
-      (define inner-measure (+ lhs-measure (measure:ft core/size inner (add1 depth))))
-      (cond
-        [(< idx lhs-measure) (define-values (idx^ l m r) (pvector-split-digit:impl lhs idx depth))
-          (define left (digit-list->ft l depth))
-          (match inner
-            [(ft:empty) (values idx^ left m (digit-list2->ft (append r (digit-add-list rhs '())) depth))]
-            [_
-              (define-values (right inner^) (digit-list+ft->digit r inner depth hdL:impl))
-              (values idx^ left m (build-ft0 core/size right inner^ rhs depth))])]
-        [(< idx inner-measure)
-          (define-values (rest-idx l m r) (pvector-split:impl inner (- idx lhs-measure) (add1 depth)))
-          (define left (left-digit+ft->ft lhs l depth))
-          (define right (right-digit+ft->ft rhs r depth))
-          (define-values (idx^ l^ m^ r^) (pvector-split-node:impl m rest-idx (add1 depth)))
-          ;; l^ / r^ 中的元素是当前 depth 层的 node，
-          ;; 这里必须显式传入 depth，不能落回 consL/consR 的默认 0。
-          (define left^
-            (for/fold ([init left]) ([i l^])
-              (consR:impl core/size init i depth)))
-          (define right^
-            (for/foldr ([init right]) ([i r^])
-              (consL:impl core/size init i depth)))
-          (values idx^ left^ m^ right^)]
-        [(< idx v)
-          (define-values (idx^ l m r)
-            (pvector-split-digit:impl rhs (- idx inner-measure) depth))
-          (define right (digit-list->ft r depth))
-          (match inner
-            [(ft:empty)
-             (values idx^
-                     (digit-list2->ft (append (digit-add-list lhs '()) l) depth)
-                     m
-                     right)]
-            [_
-             ;; 右 digit 被拆开后，左半边必须接上 l；
-             ;; 如果误用 r，会把右残片同时挂到左右两棵子树里。
-             (define-values (left inner^) (digit-list+ft->digit l inner depth hdR:impl))
-             (values idx^
-                     (build-ft0 core/size lhs inner^ left depth)
-                     m
-                     right)]
-            ) ; match: inner
-          ]
-        [else (assert-unreachable)])]))
+     (define lhs-measure (measure:digit core/size lhs depth))
+     (define inner-measure (+ lhs-measure (measure:ft core/size inner (add1 depth))))
+     (cond
+       [(< idx lhs-measure)
+        (define-values (idx^ l m r) (pvector-split-digit:impl lhs idx depth))
+        (define left (digit-list->ft l depth))
+        (match inner
+          [(ft:empty)
+           (values idx^ left m (digit-list2->ft (append r (digit-add-list rhs '())) depth))]
+          [_
+           (define-values (right inner^) (digit-list+ft->digit r inner depth hdL:impl))
+           (values idx^ left m (build-ft0 core/size right inner^ rhs depth))]
+          ) ; match: inner after lhs split
+        ]
+       [(< idx inner-measure)
+        (define-values (rest-idx l m r)
+          (pvector-split:impl inner (- idx lhs-measure) (add1 depth)))
+        (define left (left-digit+ft->ft lhs l depth))
+        (define right (right-digit+ft->ft rhs r depth))
+        (define-values (idx^ l^ m^ r^) (pvector-split-node:impl m rest-idx (add1 depth)))
+        ;; l^ / r^ 中的元素是当前 depth 层的 node，
+        ;; 这里必须显式传入 depth，不能落回 consL/consR 的默认 0。
+        (define left^
+          (for/fold ([init left]) ([i l^])
+            (consR:impl core/size init i depth)))
+        (define right^
+          (for/foldr ([init right]) ([i r^])
+            (consL:impl core/size init i depth)))
+        (values idx^ left^ m^ right^)]
+       [(< idx v)
+        (define-values (idx^ l m r)
+          (pvector-split-digit:impl rhs (- idx inner-measure) depth))
+        (define right (digit-list->ft r depth))
+        (match inner
+          [(ft:empty)
+           (values idx^
+                   (digit-list2->ft (append (digit-add-list lhs '()) l) depth)
+                   m
+                   right)]
+          [_
+           ;; 右 digit 被拆开后，左半边必须接上 l；
+           ;; 如果误用 r，会把右残片同时挂到左右两棵子树里。
+           (define-values (left inner^) (digit-list+ft->digit l inner depth hdR:impl))
+           (values idx^
+                   (build-ft0 core/size lhs inner^ left depth)
+                   m
+                   right)]
+          ) ; match: inner after rhs split
+        ]
+       [else (assert-unreachable)]
+       ) ; cond: ft:deep
+     ]
+    ) ; match: pv
+  ) ; define pvector-split:impl
 
 (define (vector->node3vector vec start len depth)
   (define new-length (quotient len 3))
@@ -457,32 +500,42 @@
 (define (pvector-insert-ft:impl ft idx value depth)
   (match ft
     [(ft:single x)
-      (define-values (x0 x1) (pvector-insert-node:impl x idx value depth))
-      (if x1 (ft:deep (add1 (measure:ft core/size ft depth)) (digit:1 x0) (ft:empty) (digit:1 x1)) (ft:single x0))]
+     (define-values (x0 x1) (pvector-insert-node:impl x idx value depth))
+     (if x1
+         (ft:deep (add1 (measure:ft core/size ft depth)) (digit:1 x0) (ft:empty) (digit:1 x1))
+         (ft:single x0))]
     [(ft:deep o left inner right)
-      (define left-size (measure:digit core/size left depth))
-      (define inner-size (measure:ft core/size inner (add1 depth)))
-      (define left-inner-size (+ left-size inner-size))
-      (cond
-        [(<= left-inner-size idx)
-          (define right^ (pvector-insert-digit:impl right (- idx left-inner-size) value depth))
-          (match right^
-            [`(,x0 ,x1 ,x2, x3 ,x4)
-              (define right-pop (build-node3 core/size x0 x1 x2 depth))
-              (define inner^ (consR:impl core/size inner right-pop (add1 depth)))
-              (ft:deep (add1 o) left inner^ (digit:2 x3 x4))]
-            [_ (ft:deep (add1 o) left inner (list->digit right^ depth))])]
-        [(<= left-size idx)
-          (define inner^ (pvector-insert-ft:impl inner (- idx left-size) value (add1 depth)))
-          (ft:deep (add1 o) left inner^ right)]
-        [else
-          (define left^ (pvector-insert-digit:impl left idx value depth))
-          (match left^
-            [`(,x0 ,x1 ,x2, x3 ,x4)
-              (define left-pop (build-node3 core/size x2 x3 x4 depth))
-              (define inner^ (consL:impl core/size inner left-pop (add1 depth)))
-              (ft:deep (add1 o) (digit:2 x0 x1) inner^ right)]
-            [_ (ft:deep (add1 o) (list->digit left^ depth) inner right)])])]))
+     (define left-size (measure:digit core/size left depth))
+     (define inner-size (measure:ft core/size inner (add1 depth)))
+     (define left-inner-size (+ left-size inner-size))
+     (cond
+       [(<= left-inner-size idx)
+        (define right^ (pvector-insert-digit:impl right (- idx left-inner-size) value depth))
+        (match right^
+          [`(,x0 ,x1 ,x2, x3 ,x4)
+           (define right-pop (build-node3 core/size x0 x1 x2 depth))
+           (define inner^ (consR:impl core/size inner right-pop (add1 depth)))
+           (ft:deep (add1 o) left inner^ (digit:2 x3 x4))]
+          [_ (ft:deep (add1 o) left inner (list->digit right^ depth))]
+          ) ; match: right^
+        ]
+       [(<= left-size idx)
+        (define inner^ (pvector-insert-ft:impl inner (- idx left-size) value (add1 depth)))
+        (ft:deep (add1 o) left inner^ right)]
+       [else
+        (define left^ (pvector-insert-digit:impl left idx value depth))
+        (match left^
+          [`(,x0 ,x1 ,x2, x3 ,x4)
+           (define left-pop (build-node3 core/size x2 x3 x4 depth))
+           (define inner^ (consL:impl core/size inner left-pop (add1 depth)))
+           (ft:deep (add1 o) (digit:2 x0 x1) inner^ right)]
+          [_ (ft:deep (add1 o) (list->digit left^ depth) inner right)]
+          ) ; match: left^
+        ]
+       ) ; cond: ft:deep
+     ]
+    ) ; match: ft
+  ) ; define pvector-insert-ft:impl
 
 (define (pvector-insert-digit:impl digit idx value depth)
   (define l (digit->list digit))

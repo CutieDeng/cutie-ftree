@@ -25,10 +25,17 @@
       (cond
         [(eqv? p0 pq-empty-measure) p1]
         [(eqv? p1 pq-empty-measure) p0]
-        [else (match (cmp-fn p0 p1)
+        [else
+         (match (cmp-fn p0 p1)
                 ['< p0]
                 ['> p1]
-                ['= p0])]))))
+                ['= p0]
+                ) ; match: cmp-fn result
+         ]
+        ) ; cond: empty measure cases
+      ) ; lambda: combine
+    ) ; ft:config
+  ) ; define make-pq-config
 
 ;; ========================================
 ;; Basic Operations
@@ -101,17 +108,21 @@
   (match ft
     [(ft:single n) (find-min-node n target)]
     [(ft:deep _ left inner right)
-      (cond
-        [(eqv? (digit-node-min left) target)
-          (for/or ([n (digit->list left)])
-            (and (eqv? (node-measure n) target)
-                 (find-min-node n target)))]
-        [(eqv? (ft-measure inner) target)
-          (find-min-inner inner target)]
-        [else
-          (for/or ([n (digit->list right)])
-            (and (eqv? (node-measure n) target)
-                 (find-min-node n target)))])]))
+     (cond
+       [(eqv? (digit-node-min left) target)
+        (for/or ([n (digit->list left)])
+          (and (eqv? (node-measure n) target)
+               (find-min-node n target)))]
+       [(eqv? (ft-measure inner) target)
+        (find-min-inner inner target)]
+       [else
+        (for/or ([n (digit->list right)])
+          (and (eqv? (node-measure n) target)
+               (find-min-node n target)))]
+       ) ; cond: choose search region
+     ]
+    ) ; match: ft
+  ) ; define find-min-inner
 
 (define (digit-node-min d)
   (for/fold ([m pq-empty-measure]) ([n (digit->list d)])
@@ -123,18 +134,22 @@
 (define (find-min-node n target)
   (match n
     [(node:2 _ a b)
-      (if (pair? a)
-          (if (eqv? (car a) target) a b)
-          (or (and (eqv? (node-measure a) target) (find-min-node a target))
-              (find-min-node b target)))]
+     (if (pair? a)
+         (if (eqv? (car a) target) a b)
+         (or (and (eqv? (node-measure a) target) (find-min-node a target))
+             (find-min-node b target)))]
     [(node:3 _ a b c)
-      (if (pair? a)
-          (cond [(eqv? (car a) target) a]
-                [(eqv? (car b) target) b]
-                [else c])
-          (or (and (eqv? (node-measure a) target) (find-min-node a target))
-              (and (eqv? (node-measure b) target) (find-min-node b target))
-              (find-min-node c target)))]))
+     (if (pair? a)
+         (cond
+           [(eqv? (car a) target) a]
+           [(eqv? (car b) target) b]
+           [else c]
+           ) ; cond: leaf node:3
+         (or (and (eqv? (node-measure a) target) (find-min-node a target))
+             (and (eqv? (node-measure b) target) (find-min-node b target))
+             (find-min-node c target)))]
+    ) ; match: n
+  ) ; define find-min-node
 
 ;; ========================================
 ;; Pop - O(log n) via split (Hinze & Paterson)
@@ -169,7 +184,9 @@
       (define-values (left elem right) (split:impl core pred ft 0))
       ;; Concat left and right to form remaining tree
       (define new-ft (concat:impl core left right 0))
-      (values (priority-queue cmp-fn new-ft (sub1 cnt)) elem)]))
+      (values (priority-queue cmp-fn new-ft (sub1 cnt)) elem)]
+    ) ; match: ft
+  ) ; define priority-queue-pop
 
 ;; ========================================
 ;; Convenience functions
