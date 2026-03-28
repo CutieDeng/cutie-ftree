@@ -36,8 +36,10 @@
   [priority-queue-peek-priority (-> priority-queue/c any/c)]
 
   ;; Pop (extract minimum)
-  [priority-queue-pop (-> priority-queue/c (values priority-queue/c (or/c #f pair?)))]
+  [priority-queue-pop
+   (-> priority-queue/c (values priority-queue/c (or/c #f pair?)))]
   [priority-queue-pop-value (-> priority-queue/c (values priority-queue/c any/c))]
 
   ;; Conversion
-  [priority-queue->list (-> priority-queue/c (listof pair?))])
+  [priority-queue->list (-> priority-queue/c (listof pair?))]
+  ) ; provide/contract

@@ -25,19 +25,22 @@
     [text-empty (-> text-buffer/c)]
     [text-empty? (-> text-buffer/c boolean?)]
     [string->text (-> string? text-buffer/c)]
-    [text->string (-> text-buffer/c string?)])
+    [text->string (-> text-buffer/c string?)]
+    ) ; contract-out: construction
 
   ;; Measures
   (contract-out
     [text-length (-> text-buffer/c exact-nonnegative-integer?)]
     [text-word-count (-> text-buffer/c exact-nonnegative-integer?)]
     [text-line-count (-> text-buffer/c exact-nonnegative-integer?)]
-    [text-para-count (-> text-buffer/c exact-nonnegative-integer?)])
+    [text-para-count (-> text-buffer/c exact-nonnegative-integer?)]
+    ) ; contract-out: measures
 
   ;; Character navigation
   (contract-out
     [text-ref (-> text-buffer/c char-index/c char?)]
-    [text-set (-> text-buffer/c char-index/c char? text-buffer/c)])
+    [text-set (-> text-buffer/c char-index/c char? text-buffer/c)]
+    ) ; contract-out: char navigation
 
   ;; Word navigation
   (contract-out
@@ -45,7 +48,8 @@
                       (values exact-nonnegative-integer?
                               exact-nonnegative-integer?
                               string?))]
-    [text-char-to-word (-> text-buffer/c char-index/c exact-nonnegative-integer?)])
+    [text-char-to-word (-> text-buffer/c char-index/c exact-nonnegative-integer?)]
+    ) ; contract-out: word navigation
 
   ;; Line navigation
   (contract-out
@@ -53,7 +57,8 @@
                       (values exact-nonnegative-integer?
                               exact-nonnegative-integer?
                               string?))]
-    [text-char-to-line (-> text-buffer/c char-index/c exact-nonnegative-integer?)])
+    [text-char-to-line (-> text-buffer/c char-index/c exact-nonnegative-integer?)]
+    ) ; contract-out: line navigation
 
   ;; Paragraph navigation
   (contract-out
@@ -61,22 +66,26 @@
                       (values exact-nonnegative-integer?
                               exact-nonnegative-integer?
                               string?))]
-    [text-char-to-para (-> text-buffer/c char-index/c exact-nonnegative-integer?)])
+    [text-char-to-para (-> text-buffer/c char-index/c exact-nonnegative-integer?)]
+    ) ; contract-out: para navigation
 
   ;; Modification
   (contract-out
     [text-insert (-> text-buffer/c char-index/c char? text-buffer/c)]
     [text-insert-string (-> text-buffer/c char-index/c string? text-buffer/c)]
     [text-delete (-> text-buffer/c char-index/c text-buffer/c)]
-    [text-delete-range (-> text-buffer/c char-index/c char-index/c text-buffer/c)])
+    [text-delete-range (-> text-buffer/c char-index/c char-index/c text-buffer/c)]
+    ) ; contract-out: modification
 
   ;; Split/append
   (contract-out
     [text-split-at (-> text-buffer/c char-index/c
                        (values text-buffer/c text-buffer/c))]
-    [text-append (-> text-buffer/c text-buffer/c text-buffer/c)])
+    [text-append (-> text-buffer/c text-buffer/c text-buffer/c)]
+    ) ; contract-out: split/append
 
   ;; Iteration (sequences don't have simple contracts)
   in-text-chars
   in-text-words
-  in-text-lines)
+  in-text-lines
+  ) ; provide

@@ -68,13 +68,14 @@
   [bitset-wrapper? (-> any/c boolean?)]
   [bitset-wrapper-bits (-> bitset-wrapper? bitset/c)]
   [bitset->set (-> bitset/c bitset-wrapper?)]
-)
+  ) ; provide/contract
 
 ;; Syntax (no contracts needed)
 (require (only-in "../bitset.rkt"
-  bitset bitset*
-  for/bitset for*/bitset
-  bitset-empty-pat bitset-cons bitset-rev bitset-has))
+                   bitset bitset*
+                   for/bitset for*/bitset
+                   bitset-empty-pat bitset-cons bitset-rev bitset-has)
+  ) ; require only-in bitset
 
 (provide bitset bitset*)
 (provide for/bitset for*/bitset)

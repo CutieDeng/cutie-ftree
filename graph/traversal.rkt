@@ -27,7 +27,8 @@
 ;; Reverse a pvector (using efficient reverse iteration)
 (define (pvector-reverse pv)
   (for/pvector ([x (in-pvector-reverse pv)])
-    x))
+    x)
+  ) ; define pvector-reverse
 
 (provide
   ;; Concrete API (Graph type)
@@ -65,9 +66,12 @@
        (define result* (pvector-cons-right result v))
        (for/fold ([r result*])
                  ([succ (in-bitset/reverse (graph-successors-impl g v))])
-         (visit succ r))]))
+         (visit succ r))]
+      ) ; cond: visit
+    ) ; define visit
 
-  (visit start-val (pvector-empty)))
+  (visit start-val (pvector-empty))
+  ) ; define graph-dfs-preorder
 
 ;; graph-dfs-postorder: Graph, vertex-id -> pvector[vertex-val]
 ;;
@@ -86,10 +90,14 @@
        (define result*
          (for/fold ([r result])
                    ([succ (in-bitset/reverse (graph-successors-impl g v))])
-           (visit succ r)))
-       (pvector-cons-right result* v)]))
+           (visit succ r))
+         ) ; define result*
+       (pvector-cons-right result* v)]
+      ) ; cond: visit
+    ) ; define visit
 
-  (visit start-val (pvector-empty)))
+  (visit start-val (pvector-empty))
+  ) ; define graph-dfs-postorder
 
 ;; graph-dfs-reverse-postorder: Graph, vertex-id -> pvector[vertex-val]
 ;;
@@ -97,7 +105,8 @@
 ;; Returns pvector of vertex-id-vals in reverse postorder.
 ;;
 (define (graph-dfs-reverse-postorder g start)
-  (pvector-reverse (graph-dfs-postorder g start)))
+  (pvector-reverse (graph-dfs-postorder g start))
+  ) ; define graph-dfs-reverse-postorder
 
 ;; graph-bfs: Graph, vertex-id -> pvector[vertex-val]
 ;;
@@ -123,10 +132,16 @@
              [(bitset-member? vis succ) (values q vis)]
              [else
               (values (pvector-cons-right q succ)
-                      (bitset-add vis succ))])))
+                      (bitset-add vis succ))]
+             ) ; cond: successor seen?
+           ) ; for/fold
+         ) ; define-values new-queue/new-visited
 
        (set! visited new-visited)
-       (loop new-queue result*)])))
+       (loop new-queue result*)]
+      ) ; cond: queue empty?
+    ) ; let loop
+  ) ; define graph-bfs
 
 ;; graph-topo-sort: Graph -> pvector[vertex-val] or #f
 ;;
@@ -142,7 +157,8 @@
   (for ([v (in-bitset/reverse vertices)])
     (define preds (graph-predecessors-impl g v))
     (set! in-degree
-          (ordered-map-set in-degree v (bitset-count preds))))
+          (ordered-map-set in-degree v (bitset-count preds)))
+    ) ; for: vertices
 
   ;; Find nodes with zero in-degree
   (define initial-queue
@@ -150,7 +166,8 @@
               ([v (in-bitset/reverse vertices)])
       (if (= (dict-ref in-degree v 0) 0)
           (pvector-cons-right q v)
-          q)))
+          q))
+    ) ; define initial-queue
 
   (define vertex-count (bitset-count vertices))
 
@@ -174,9 +191,13 @@
            (define d* (ordered-map-set d succ new-deg))
            (if (= new-deg 0)
                (values (pvector-cons-right q succ) d*)
-               (values q d*))))
+               (values q d*)))
+         ) ; for/fold
 
-       (loop new-queue result* new-degrees)])))
+       (loop new-queue result* new-degrees)]
+      ) ; cond: queue empty?
+    ) ; let loop
+  ) ; define graph-topo-sort
 
 ;; ============================================================
 ;; Parameterized API: Callbacks
@@ -200,9 +221,12 @@
        (define result* (pvector-cons-right result node))
        (for/fold ([r result*])
                  ([succ (in-pvector (get-successors node))])
-         (visit succ r))]))
+         (visit succ r))]
+      ) ; cond: visit
+    ) ; define visit
 
-  (visit start (pvector-empty)))
+  (visit start (pvector-empty))
+  ) ; define dfs-preorder
 
 ;; dfs-postorder: DFS postorder traversal
 ;; Parameters:
@@ -222,10 +246,14 @@
        (define result*
          (for/fold ([r result])
                    ([succ (in-pvector (get-successors node))])
-           (visit succ r)))
-       (pvector-cons-right result* node)]))
+           (visit succ r))
+         ) ; define result*
+       (pvector-cons-right result* node)]
+      ) ; cond: visit
+    ) ; define visit
 
-  (visit start (pvector-empty)))
+  (visit start (pvector-empty))
+  ) ; define dfs-postorder
 
 ;; dfs-reverse-postorder: DFS reverse postorder (topological order for DAGs)
 ;; Parameters:
@@ -235,7 +263,8 @@
 ;; Returns: pvector of nodes in reverse postorder
 ;;
 (define (dfs-reverse-postorder node-compare get-successors start)
-  (pvector-reverse (dfs-postorder node-compare get-successors start)))
+  (pvector-reverse (dfs-postorder node-compare get-successors start))
+  ) ; define dfs-reverse-postorder
 
 ;; bfs: Breadth-first search
 ;; Parameters:
@@ -263,10 +292,16 @@
              [(ordered-map-has-key? v succ) (values q v)]
              [else
               (values (pvector-cons-right q succ)
-                      (ordered-map-set v succ #t))])))
+                      (ordered-map-set v succ #t))]
+             ) ; cond: successor seen?
+           ) ; for/fold
+         ) ; define-values new-queue/new-visited
 
        (set! visited new-visited)
-       (loop new-queue result*)])))
+       (loop new-queue result*)]
+      ) ; cond: queue empty?
+    ) ; let loop
+  ) ; define bfs
 
 ;; topology-sort: Topological sort using Kahn's algorithm
 ;; Parameters:
@@ -283,7 +318,8 @@
   (for ([node (in-pvector nodes)])
     (set! in-degree
           (ordered-map-set in-degree node
-                           (pvector-length (get-predecessors node)))))
+                           (pvector-length (get-predecessors node))))
+    ) ; for: nodes
 
   ;; Find nodes with zero in-degree
   (define initial-queue
@@ -291,7 +327,8 @@
               ([node (in-pvector nodes)])
       (if (= (dict-ref in-degree node 0) 0)
           (pvector-cons-right q node)
-          q)))
+          q))
+    ) ; define initial-queue
 
   (let loop ([queue initial-queue]
              [result (pvector-empty)]
@@ -313,6 +350,10 @@
            (define d* (ordered-map-set d succ new-deg))
            (if (= new-deg 0)
                (values (pvector-cons-right q succ) d*)
-               (values q d*))))
+               (values q d*)))
+         ) ; for/fold
 
-       (loop new-queue result* new-degrees)])))
+       (loop new-queue result* new-degrees)]
+      ) ; cond: queue empty?
+    ) ; let loop
+  ) ; define topology-sort

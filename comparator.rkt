@@ -30,16 +30,21 @@
   (cond
     [(< x0 x1) '<]
     [(= x0 x1) '=]
-    [else '>]))
+    [else '>]
+    ) ; cond: integer-compare
+  ) ; define integer-compare
 
 (define (string-compare x0 x1)
   (cond
     [(string<? x0 x1) '<]
     [(string=? x0 x1) '=]
-    [else '>]))
+    [else '>]
+    ) ; cond: string-compare
+  ) ; define string-compare
 
 (define (symbol-compare x0 x1)
-  (string-compare (symbol->string x0) (symbol->string x1)))
+  (string-compare (symbol->string x0) (symbol->string x1))
+  ) ; define symbol-compare
 
 ;; ========================================
 ;; Comparator Constructors
@@ -51,7 +56,10 @@
     (cond
       [(less-than? a b) '<]
       [(equal-to? a b) '=]
-      [else '>])))
+      [else '>]
+      ) ; cond: make-comparator lambda
+    ) ; lambda
+  ) ; define make-comparator
 
 ;; Create a comparator from a cmp-style function (returns -1, 0, 1)
 (define (comparator-from-cmp cmp)
@@ -60,7 +68,10 @@
     (cond
       [(negative? r) '<]
       [(zero? r) '=]
-      [else '>])))
+      [else '>]
+      ) ; cond: comparator-from-cmp lambda
+    ) ; lambda
+  ) ; define comparator-from-cmp
 
 ;; ========================================
 ;; Exports

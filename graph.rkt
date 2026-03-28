@@ -33,10 +33,12 @@
 (struct edge-id (val) #:transparent)
 
 (define (vertex-id-compare a b)
-  (integer-compare (vertex-id-val a) (vertex-id-val b)))
+  (integer-compare (vertex-id-val a) (vertex-id-val b))
+  ) ; define vertex-id-compare
 
 (define (edge-id-compare a b)
-  (integer-compare (edge-id-val a) (edge-id-val b)))
+  (integer-compare (edge-id-val a) (edge-id-val b))
+  ) ; define edge-id-compare
 
 ;; ========================================
 ;; Input Validation Helpers
@@ -46,13 +48,15 @@
   (unless (vertex-id? v)
     (raise-argument-error who "vertex-id?" pos v))
   (unless (graph-vertex?-impl g (vertex-id-val v))
-    (error who "vertex does not exist in graph: ~a" v)))
+    (error who "vertex does not exist in graph: ~a" v))
+  ) ; define check-vertex-id
 
 (define (check-edge-id who g e pos)
   (unless (edge-id? e)
     (raise-argument-error who "edge-id?" pos e))
   (unless (graph-edge?-impl g (edge-id-val e))
-    (error who "edge does not exist in graph: ~a" e)))
+    (error who "edge does not exist in graph: ~a" e))
+  ) ; define check-edge-id
 
 ;; ========================================
 ;; Vertex Operations (Safe API)
@@ -61,21 +65,25 @@
 ;; Add a new vertex, returns (values new-graph vertex-id)
 (define (graph-add-vertex g)
   (define-values (g* vid) (graph-add-vertex-impl g))
-  (values g* (vertex-id vid)))
+  (values g* (vertex-id vid))
+  ) ; define graph-add-vertex
 
 ;; Check if vertex exists
 (define (graph-vertex? g v)
   (and (vertex-id? v)
-       (graph-vertex?-impl g (vertex-id-val v))))
+       (graph-vertex?-impl g (vertex-id-val v)))
+  ) ; define graph-vertex?
 
 ;; Get all vertices as pvector of vertex-id
 (define (graph-vertices-set g)
   (for/pvector ([v (in-bitset (graph-vertices-set-impl g))])
-    (vertex-id v)))
+    (vertex-id v))
+  ) ; define graph-vertices-set
 
 ;; Get vertex count (cached)
 (define (graph-vertex-count g)
-  (graph-vertex-count-impl g))
+  (graph-vertex-count-impl g)
+  ) ; define graph-vertex-count
 
 ;; Remove vertex (must have no edges)
 (define (graph-remove-vertex g v)
@@ -90,7 +98,8 @@
   (unless (bitset-empty? out-e)
     (error 'graph-remove-vertex "vertex has out-edges: ~a" v))
 
-  (graph-remove-vertex-impl g vid))
+  (graph-remove-vertex-impl g vid)
+  ) ; define graph-remove-vertex
 
 ;; Remove vertex and all its edges (cascade delete)
 (define (graph-remove-vertex* g v)
@@ -107,10 +116,12 @@
     (for/fold ([g g]) ([eid (in-bitset all-edges)])
       (if (graph-edge?-impl g eid)
           (graph-remove-edge-impl g eid)
-          g)))
+          g))
+    ) ; define g1
 
   ;; Now remove the vertex itself
-  (graph-remove-vertex-impl g1 vid))
+  (graph-remove-vertex-impl g1 vid)
+  ) ; define graph-remove-vertex*
 
 ;; ========================================
 ;; Edge Operations (Safe API)
@@ -122,7 +133,8 @@
   (check-vertex-id 'graph-add-edge g dst 2)
   (define-values (g* eid)
     (graph-add-edge-impl g (vertex-id-val src) (vertex-id-val dst)))
-  (values g* (edge-id eid)))
+  (values g* (edge-id eid))
+  ) ; define graph-add-edge
 
 ;; Add edge pair (bidirectional), returns (values new-graph edge1 edge2)
 (define (graph-add-edge-pair g v1 v2)
@@ -130,76 +142,91 @@
   (check-vertex-id 'graph-add-edge-pair g v2 2)
   (define-values (g* e1 e2)
     (graph-add-edge-pair-impl g (vertex-id-val v1) (vertex-id-val v2)))
-  (values g* (edge-id e1) (edge-id e2)))
+  (values g* (edge-id e1) (edge-id e2))
+  ) ; define graph-add-edge-pair
 
 ;; Check if edge exists
 (define (graph-edge? g e)
   (and (edge-id? e)
-       (graph-edge?-impl g (edge-id-val e))))
+       (graph-edge?-impl g (edge-id-val e)))
+  ) ; define graph-edge?
 
 ;; Get all edges as pvector of edge-id
 (define (graph-edges-set g)
   (for/pvector ([e (in-bitset (graph-edges-set-impl g))])
-    (edge-id e)))
+    (edge-id e))
+  ) ; define graph-edges-set
 
 ;; Get edge count (cached)
 (define (graph-edge-count g)
-  (graph-edge-count-impl g))
+  (graph-edge-count-impl g)
+  ) ; define graph-edge-count
 
 ;; Get edge source vertex
 (define (graph-edge-src g e)
   (check-edge-id 'graph-edge-src g e 1)
   (define v (graph-edge-src-impl g (edge-id-val e)))
-  (vertex-id v))
+  (vertex-id v)
+  ) ; define graph-edge-src
 
 ;; Get edge destination vertex
 (define (graph-edge-dst g e)
   (check-edge-id 'graph-edge-dst g e 1)
   (define v (graph-edge-dst-impl g (edge-id-val e)))
-  (vertex-id v))
+  (vertex-id v)
+  ) ; define graph-edge-dst
 
 ;; Get edge endpoints as (values src dst)
 (define (graph-edge-endpoints g e)
   (check-edge-id 'graph-edge-endpoints g e 1)
   (define-values (src dst) (graph-edge-endpoints-impl g (edge-id-val e)))
-  (values (vertex-id src) (vertex-id dst)))
+  (values (vertex-id src) (vertex-id dst))
+  ) ; define graph-edge-endpoints
 
 ;; Get paired edge (or #f)
 (define (graph-edge-pair g e)
   (check-edge-id 'graph-edge-pair g e 1)
   (define paired (graph-edge-pair-impl g (edge-id-val e)))
-  (and paired (edge-id paired)))
+  (and paired (edge-id paired))
+  ) ; define graph-edge-pair
 
 ;; Remove single edge
 (define (graph-remove-edge g e)
   (check-edge-id 'graph-remove-edge g e 1)
-  (graph-remove-edge-impl g (edge-id-val e)))
+  (graph-remove-edge-impl g (edge-id-val e))
+  ) ; define graph-remove-edge
 
 ;; Remove edge and its paired edge (if exists)
 (define (graph-remove-edge* g e)
   (check-edge-id 'graph-remove-edge* g e 1)
-  (graph-remove-edge*-impl g (edge-id-val e)))
+  (graph-remove-edge*-impl g (edge-id-val e))
+  ) ; define graph-remove-edge*
 
 ;; Remove the single edge between src and dst (error if 0 or >1 edges)
 (define (graph-remove-edge-between g src dst)
   (check-vertex-id 'graph-remove-edge-between g src 1)
   (check-vertex-id 'graph-remove-edge-between g dst 2)
-  (define edges (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))
+  (define edges
+    (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))
   (cond
     [(bitset-empty? edges)
      (error 'graph-remove-edge-between "no edge from ~a to ~a" src dst)]
     [(> (bitset-count edges) 1)
      (error 'graph-remove-edge-between "multiple edges from ~a to ~a, use graph-remove-edges-between" src dst)]
     [else
-     (graph-remove-edge-impl g (bitset-min edges))]))
+     (graph-remove-edge-impl g (bitset-min edges))]
+    ) ; cond: edge multiplicity
+  ) ; define graph-remove-edge-between
 
 ;; Remove all edges from src to dst
 (define (graph-remove-edges-between g src dst)
   (check-vertex-id 'graph-remove-edges-between g src 1)
   (check-vertex-id 'graph-remove-edges-between g dst 2)
-  (define edges (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))
+  (define edges
+    (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))
   (for/fold ([g g]) ([eid (in-bitset edges)])
-    (graph-remove-edge-impl g eid)))
+    (graph-remove-edge-impl g eid))
+  ) ; define graph-remove-edges-between
 
 ;; ========================================
 ;; Adjacency Queries (Safe API)
@@ -209,13 +236,15 @@
 (define (graph-in-edges g v)
   (check-vertex-id 'graph-in-edges g v 1)
   (for/pvector ([e (in-bitset (graph-in-edges-impl g (vertex-id-val v)))])
-    (edge-id e)))
+    (edge-id e))
+  ) ; define graph-in-edges
 
 ;; Get out-edges of vertex as pvector of edge-id
 (define (graph-out-edges g v)
   (check-vertex-id 'graph-out-edges g v 1)
   (for/pvector ([e (in-bitset (graph-out-edges-impl g (vertex-id-val v)))])
-    (edge-id e)))
+    (edge-id e))
+  ) ; define graph-out-edges
 
 ;; Get in-degree
 (define (graph-in-degree g v)
@@ -232,7 +261,8 @@
   (check-vertex-id 'graph-edges-between g src 1)
   (check-vertex-id 'graph-edges-between g dst 2)
   (for/pvector ([e (in-bitset (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))])
-    (edge-id e)))
+    (edge-id e))
+  ) ; define graph-edges-between
 
 ;; Check if there's any edge from src to dst
 (define (graph-has-edge-to? g src dst)
@@ -244,13 +274,15 @@
 (define (graph-successors g v)
   (check-vertex-id 'graph-successors g v 1)
   (for/pvector ([vid (in-bitset (graph-successors-impl g (vertex-id-val v)))])
-    (vertex-id vid)))
+    (vertex-id vid))
+  ) ; define graph-successors
 
 ;; Get predecessor vertices as pvector of vertex-id
 (define (graph-predecessors g v)
   (check-vertex-id 'graph-predecessors g v 1)
   (for/pvector ([vid (in-bitset (graph-predecessors-impl g (vertex-id-val v)))])
-    (vertex-id vid)))
+    (vertex-id vid))
+  ) ; define graph-predecessors
 
 ;; ========================================
 ;; Iteration (Safe API)
@@ -262,13 +294,17 @@
 (define (in-graph-vertices g)
   (in-generator
     (for ([v (in-bitset (graph-vertices-set-impl g))])
-      (yield (vertex-id v)))))
+      (yield (vertex-id v)))
+    ) ; in-generator
+  ) ; define in-graph-vertices
 
 ;; Iterate over edge-ids
 (define (in-graph-edges g)
   (in-generator
     (for ([e (in-bitset (graph-edges-set-impl g))])
-      (yield (edge-id e)))))
+      (yield (edge-id e)))
+    ) ; in-generator
+  ) ; define in-graph-edges
 
 ;; Iterate over (edge-id src dst) tuples for out-edges of a vertex
 (define (in-graph-out-edges g v)
@@ -277,21 +313,27 @@
   (in-generator
     (for ([eid (in-bitset (graph-out-edges-impl g vid))])
       (define-values (src dst) (graph-edge-endpoints-impl g eid))
-      (yield (values (edge-id eid) (vertex-id src) (vertex-id dst))))))
+      (yield (values (edge-id eid) (vertex-id src) (vertex-id dst))))
+    ) ; in-generator
+  ) ; define in-graph-out-edges
 
 ;; Iterate over successor vertex-ids
 (define (in-graph-successors g v)
   (check-vertex-id 'in-graph-successors g v 1)
   (in-generator
     (for ([vid (in-bitset (graph-successors-impl g (vertex-id-val v)))])
-      (yield (vertex-id vid)))))
+      (yield (vertex-id vid)))
+    ) ; in-generator
+  ) ; define in-graph-successors
 
 ;; Iterate over predecessor vertex-ids
 (define (in-graph-predecessors g v)
   (check-vertex-id 'in-graph-predecessors g v 1)
   (in-generator
     (for ([vid (in-bitset (graph-predecessors-impl g (vertex-id-val v)))])
-      (yield (vertex-id vid)))))
+      (yield (vertex-id vid)))
+    ) ; in-generator
+  ) ; define in-graph-predecessors
 
 ;; ========================================
 ;; Exports

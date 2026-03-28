@@ -50,10 +50,12 @@
     (unless (bitset-member? visited v)
       (set! visited (bitset-add visited v))
       (for ([succ (in-bitset/reverse (graph-successors-impl g v))])
-        (visit succ))))
+        (visit succ)))
+    ) ; define visit
 
   (visit start-val)
-  visited)
+  visited
+  ) ; define graph-reachable-from
 
 ;; graph-reachable-from-set: Graph, bitset -> bitset
 ;;
@@ -67,12 +69,14 @@
     (unless (bitset-member? visited v)
       (set! visited (bitset-add visited v))
       (for ([succ (in-bitset/reverse (graph-successors-impl g v))])
-        (visit succ))))
+        (visit succ)))
+    ) ; define visit
 
   (for ([start (in-bitset/reverse starts)])
     (visit start))
 
-  visited)
+  visited
+  ) ; define graph-reachable-from-set
 
 ;; graph-find-path: Graph, vertex-id, vertex-id -> pvector[vertex-val] or #f
 ;;
@@ -95,7 +99,8 @@
        (for/or ([succ (in-bitset/reverse (graph-successors-impl g v))])
          (search succ path*))]))
 
-  (search start-val (pvector-empty)))
+  (search start-val (pvector-empty))
+  ) ; define graph-find-path
 
 ;; graph-all-paths: Graph, vertex-id, vertex-id -> pvector[pvector[vertex-val]]
 ;;
@@ -118,7 +123,8 @@
                  ([succ (in-bitset/reverse (graph-successors-impl g v))])
          (pvector-append paths (search succ path* new-visited)))]))
 
-  (search start-val (pvector-empty) bitset-empty))
+  (search start-val (pvector-empty) bitset-empty)
+  ) ; define graph-all-paths
 
 ;; ============================================================
 ;; Parameterized API: Callbacks
@@ -144,7 +150,8 @@
                  ([succ (in-pvector (get-successors node))])
          (visit succ r))]))
 
-  (visit start (pvector-empty)))
+  (visit start (pvector-empty))
+  ) ; define reachable-from
 
 ;; reachable-from-set: Find all nodes reachable from any node in starts
 ;; Parameters:
@@ -160,12 +167,14 @@
     (unless (ordered-map-has-key? visited node)
       (set! visited (ordered-map-set visited node #t))
       (for ([succ (in-pvector (get-successors node))])
-        (visit succ))))
+        (visit succ)))
+    ) ; define visit
 
   (for ([start (in-pvector starts)])
     (visit start))
 
-  visited)
+  visited
+  ) ; define reachable-from-set
 
 ;; find-path: Find a path from start to end (if exists)
 ;; Parameters:
@@ -189,7 +198,8 @@
        (for/or ([succ (in-pvector (get-successors node))])
          (search succ path*))]))
 
-  (search start (pvector-empty)))
+  (search start (pvector-empty))
+  ) ; define find-path
 
 ;; all-paths: Find all paths from start to end
 ;; Parameters:
@@ -212,4 +222,5 @@
                  ([succ (in-pvector (get-successors node))])
          (pvector-append paths (search succ path* new-visited)))]))
 
-  (search start (pvector-empty) (ordered-map-empty node-compare)))
+  (search start (pvector-empty) (ordered-map-empty node-compare))
+  ) ; define all-paths

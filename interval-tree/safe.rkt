@@ -33,11 +33,17 @@
   [interval-tree-insert (-> interval-tree/c endpoint/c endpoint/c any/c interval-tree/c)]
 
   ;; Query
-  [interval-tree-search (-> interval-tree/c endpoint/c endpoint/c (listof (list/c endpoint/c endpoint/c any/c)))]
-  [interval-tree-search-point (-> interval-tree/c endpoint/c (listof (list/c endpoint/c endpoint/c any/c)))]
+  [interval-tree-search
+   (-> interval-tree/c endpoint/c endpoint/c
+       (listof (list/c endpoint/c endpoint/c any/c)))]
+  [interval-tree-search-point
+   (-> interval-tree/c endpoint/c
+       (listof (list/c endpoint/c endpoint/c any/c)))]
 
   ;; Delete
   [interval-tree-delete (-> interval-tree/c endpoint/c endpoint/c any/c interval-tree/c)]
 
   ;; Conversion
-  [interval-tree->list (-> interval-tree/c (listof (list/c endpoint/c endpoint/c any/c)))])
+  [interval-tree->list
+   (-> interval-tree/c (listof (list/c endpoint/c endpoint/c any/c)))]
+  ) ; provide/contract

@@ -71,7 +71,8 @@
     (ordered-map-empty integer-compare)    ; edge-pair*
     (ordered-map-empty integer-compare)    ; in-edges*
     (ordered-map-empty integer-compare)    ; out-edges*
-    (ordered-map-empty integer-compare)))  ; adjacency
+    (ordered-map-empty integer-compare))
+  ) ; define graph-empty
 
 ;; ========================================
 ;; ID Allocation Helpers
@@ -108,6 +109,7 @@
   (match-define (graph next-v next-e verts edges
                        v-cnt e-cnt e-src e-dst e-pair
                        in-e out-e adj) g1)
+  (define empty-adj (ordered-map-empty integer-compare))
   (values
     (graph next-v next-e
            (bitset-add verts vid)
@@ -117,8 +119,9 @@
            e-src e-dst e-pair
            (ordered-map-set in-e vid bitset-empty)
            (ordered-map-set out-e vid bitset-empty)
-           (ordered-map-set adj vid (ordered-map-empty integer-compare)))
-    vid))  ; Returns raw integer!
+           (ordered-map-set adj vid empty-adj))
+    vid)
+  ) ; define graph-add-vertex-impl
 
 ;; Check if vertex exists (takes raw integer)
 (define (graph-vertex?-impl g vid)
@@ -169,13 +172,21 @@
   ;; Update in-edges and out-edges
   (define src-out (ordered-map-ref out-e src-v bitset-empty))
   (define dst-in (ordered-map-ref in-e dst-v bitset-empty))
-  (define new-out-e (ordered-map-set out-e src-v (bitset-add src-out eid)))
-  (define new-in-e (ordered-map-set in-e dst-v (bitset-add dst-in eid)))
+  (define new-out-e
+    (ordered-map-set out-e src-v (bitset-add src-out eid))
+    ) ; define new-out-e
+  (define new-in-e
+    (ordered-map-set in-e dst-v (bitset-add dst-in eid))
+    ) ; define new-in-e
 
   ;; Update adjacency (three-level)
-  (define src-adj (ordered-map-ref adj src-v (ordered-map-empty integer-compare)))
+  (define src-adj
+    (ordered-map-ref adj src-v (ordered-map-empty integer-compare))
+    ) ; define src-adj
   (define src-dst-edges (ordered-map-ref src-adj dst-v bitset-empty))
-  (define new-src-adj (ordered-map-set src-adj dst-v (bitset-add src-dst-edges eid)))
+  (define new-src-adj
+    (ordered-map-set src-adj dst-v (bitset-add src-dst-edges eid))
+    ) ; define new-src-adj
   (define new-adj (ordered-map-set adj src-v new-src-adj))
 
   (values
@@ -186,7 +197,8 @@
            (add1 e-cnt)
            new-e-src new-e-dst e-pair
            new-in-e new-out-e new-adj)
-    eid))  ; Returns raw integer!
+    eid)
+  ) ; define graph-add-edge-impl
 
 ;; Add edge pair (bidirectional), returns (values new-graph edge1-val edge2-val)
 (define (graph-add-edge-pair-impl g v1 v2)
@@ -223,23 +235,30 @@
 (define (graph-edge-src-impl g eid)
   (match (ordered-map-query (graph-edge-src* g) eid)
     [#f #f]
-    [(cons _ v) v]))
+    [(cons _ v) v]
+    ) ; match: edge src
+  ) ; define graph-edge-src-impl
 
 ;; Get edge destination vertex (returns raw integer)
 (define (graph-edge-dst-impl g eid)
   (match (ordered-map-query (graph-edge-dst* g) eid)
     [#f #f]
-    [(cons _ v) v]))
+    [(cons _ v) v]
+    ) ; match: edge dst
+  ) ; define graph-edge-dst-impl
 
 ;; Get edge endpoints as (values src-val dst-val)
 (define (graph-edge-endpoints-impl g eid)
-  (values (graph-edge-src-impl g eid) (graph-edge-dst-impl g eid)))
+  (values (graph-edge-src-impl g eid) (graph-edge-dst-impl g eid))
+  ) ; define graph-edge-endpoints-impl
 
 ;; Get paired edge (returns raw integer or #f)
 (define (graph-edge-pair-impl g eid)
   (match (ordered-map-query (graph-edge-pair* g) eid)
     [#f #f]
-    [(cons _ paired-id) paired-id]))
+    [(cons _ paired-id) paired-id]
+    ) ; match: edge pair
+  ) ; define graph-edge-pair-impl
 
 ;; Remove single edge (takes raw integer)
 (define (graph-remove-edge-impl g eid)
@@ -267,24 +286,35 @@
        p2]
       [else
        (define-values (p1 _3) (ordered-map-delete e-pair eid))
-       p1]))
+       p1]
+      ) ; cond: paired edge exists?
+    ) ; define new-e-pair
 
   ;; Remove from out-edges[src]
   (define src-out (ordered-map-ref out-e src-v bitset-empty))
-  (define new-out-e (ordered-map-set out-e src-v (bitset-remove src-out eid)))
+  (define new-out-e
+    (ordered-map-set out-e src-v (bitset-remove src-out eid))
+    ) ; define new-out-e
 
   ;; Remove from in-edges[dst]
   (define dst-in (ordered-map-ref in-e dst-v bitset-empty))
-  (define new-in-e (ordered-map-set in-e dst-v (bitset-remove dst-in eid)))
+  (define new-in-e
+    (ordered-map-set in-e dst-v (bitset-remove dst-in eid))
+    ) ; define new-in-e
 
   ;; Remove from adjacency[src][dst]
-  (define src-adj (ordered-map-ref adj src-v (ordered-map-empty integer-compare)))
+  (define src-adj
+    (ordered-map-ref adj src-v (ordered-map-empty integer-compare))
+    ) ; define src-adj
   (define src-dst-edges (ordered-map-ref src-adj dst-v bitset-empty))
   (define new-src-dst-edges (bitset-remove src-dst-edges eid))
   (define new-src-adj
     (if (bitset-empty? new-src-dst-edges)
-        (let-values ([(m _) (ordered-map-delete src-adj dst-v)]) m)
-        (ordered-map-set src-adj dst-v new-src-dst-edges)))
+        (let-values ([(m _) (ordered-map-delete src-adj dst-v)])
+          m
+          ) ; let-values: delete empty dst bucket
+        (ordered-map-set src-adj dst-v new-src-dst-edges))
+    ) ; define new-src-adj
   (define new-adj (ordered-map-set adj src-v new-src-adj))
 
   (graph next-v next-e
@@ -317,22 +347,26 @@
 
 ;; Get in-degree
 (define (graph-in-degree-impl g vid)
-  (bitset-count (graph-in-edges-impl g vid)))
+  (bitset-count (graph-in-edges-impl g vid))
+  ) ; define graph-in-degree-impl
 
 ;; Get out-degree
 (define (graph-out-degree-impl g vid)
-  (bitset-count (graph-out-edges-impl g vid)))
+  (bitset-count (graph-out-edges-impl g vid))
+  ) ; define graph-out-degree-impl
 
 ;; Get edges from src to dst (bitset of edge vals)
 (define (graph-edges-between-impl g src-v dst-v)
   (define src-adj (ordered-map-ref (graph-adjacency g) src-v #f))
   (if src-adj
       (ordered-map-ref src-adj dst-v bitset-empty)
-      bitset-empty))
+      bitset-empty)
+  ) ; define graph-edges-between-impl
 
 ;; Check if there's any edge from src to dst
 (define (graph-has-edge-to?-impl g src-v dst-v)
-  (not (bitset-empty? (graph-edges-between-impl g src-v dst-v))))
+  (not (bitset-empty? (graph-edges-between-impl g src-v dst-v)))
+  ) ; define graph-has-edge-to?-impl
 
 ;; Get successor vertices (bitset of vertex vals)
 (define (graph-successors-impl g vid)
@@ -340,13 +374,15 @@
   (if v-adj
       (for/bitset ([kv (in-ordered-map v-adj)])
         (car kv))
-      bitset-empty))
+      bitset-empty)
+  ) ; define graph-successors-impl
 
 ;; Get predecessor vertices (bitset of vertex vals)
 (define (graph-predecessors-impl g vid)
   (define in-e (graph-in-edges-impl g vid))
   (for/bitset ([eid (in-bitset in-e)])
-    (graph-edge-src-impl g eid)))
+    (graph-edge-src-impl g eid))
+  ) ; define graph-predecessors-impl
 
 ;; ========================================
 ;; Exports
