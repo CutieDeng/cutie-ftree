@@ -49,7 +49,7 @@
   (define (visit v)
     (unless (bitset-member? visited v)
       (set! visited (bitset-add visited v))
-      (for ([succ (in-bitset/rev (graph-successors-impl g v))])
+      (for ([succ (in-bitset/reverse (graph-successors-impl g v))])
         (visit succ))))
 
   (visit start-val)
@@ -66,10 +66,10 @@
   (define (visit v)
     (unless (bitset-member? visited v)
       (set! visited (bitset-add visited v))
-      (for ([succ (in-bitset/rev (graph-successors-impl g v))])
+      (for ([succ (in-bitset/reverse (graph-successors-impl g v))])
         (visit succ))))
 
-  (for ([start (in-bitset/rev starts)])
+  (for ([start (in-bitset/reverse starts)])
     (visit start))
 
   visited)
@@ -92,7 +92,7 @@
       [else
        (set! visited (bitset-add visited v))
        (define path* (pvector-cons-right path v))
-       (for/or ([succ (in-bitset/rev (graph-successors-impl g v))])
+       (for/or ([succ (in-bitset/reverse (graph-successors-impl g v))])
          (search succ path*))]))
 
   (search start-val (pvector-empty)))
@@ -115,7 +115,7 @@
        (define new-visited (bitset-add visited v))
        (define path* (pvector-cons-right path v))
        (for/fold ([paths (pvector-empty)])
-                 ([succ (in-bitset/rev (graph-successors-impl g v))])
+                 ([succ (in-bitset/reverse (graph-successors-impl g v))])
          (pvector-append paths (search succ path* new-visited)))]))
 
   (search start-val (pvector-empty) bitset-empty))

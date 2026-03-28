@@ -148,10 +148,10 @@
   (define time-bitset-rev
     (measure-time
       (lambda ()
-        (for/fold ([sum 0]) ([i (in-bitset/rev bs)])
+        (for/fold ([sum 0]) ([i (in-bitset/reverse bs)])
           (+ sum i)))
       iterations))
-  (format-result "in-bitset/rev" time-bitset-rev iterations)
+  (format-result "in-bitset/reverse" time-bitset-rev iterations)
 
   ;; Racket set iteration
   (define time-set

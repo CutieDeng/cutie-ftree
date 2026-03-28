@@ -54,7 +54,7 @@
 
   ;; Iteration
   [in-bitset (-> bitset/c sequence?)]
-  [in-bitset/rev (-> bitset/c sequence?)]
+  [in-bitset/reverse (-> bitset/c sequence?)]
 
   ;; Conversions
   [seq->bitset (-> sequence? bitset/c)]

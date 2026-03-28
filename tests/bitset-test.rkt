@@ -142,10 +142,10 @@
   (check-equal? (for/list ([i (in-bitset 0)]) i)
                 '()))
 
-(test-case "in-bitset/rev"
-  (check-equal? (for/list ([i (in-bitset/rev (bitset 0 2 5 7))]) i)
+(test-case "in-bitset/reverse"
+  (check-equal? (for/list ([i (in-bitset/reverse (bitset 0 2 5 7))]) i)
                 '(7 5 2 0))
-  (check-equal? (for/list ([i (in-bitset/rev 0)]) i)
+  (check-equal? (for/list ([i (in-bitset/reverse 0)]) i)
                 '()))
 
 ;; ========================================

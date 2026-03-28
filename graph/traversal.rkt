@@ -64,7 +64,7 @@
        (set! visited (bitset-add visited v))
        (define result* (pvector-cons-right result v))
        (for/fold ([r result*])
-                 ([succ (in-bitset/rev (graph-successors-impl g v))])
+                 ([succ (in-bitset/reverse (graph-successors-impl g v))])
          (visit succ r))]))
 
   (visit start-val (pvector-empty)))
@@ -85,7 +85,7 @@
        (set! visited (bitset-add visited v))
        (define result*
          (for/fold ([r result])
-                   ([succ (in-bitset/rev (graph-successors-impl g v))])
+                   ([succ (in-bitset/reverse (graph-successors-impl g v))])
            (visit succ r)))
        (pvector-cons-right result* v)]))
 
@@ -118,7 +118,7 @@
 
        (define-values (new-queue new-visited)
          (for/fold ([q queue*] [vis visited])
-                   ([succ (in-bitset/rev (graph-successors-impl g v))])
+                   ([succ (in-bitset/reverse (graph-successors-impl g v))])
            (cond
              [(bitset-member? vis succ) (values q vis)]
              [else
@@ -139,7 +139,7 @@
   (define in-degree (ordered-map-empty integer-compare))
 
   ;; Calculate in-degrees
-  (for ([v (in-bitset/rev vertices)])
+  (for ([v (in-bitset/reverse vertices)])
     (define preds (graph-predecessors-impl g v))
     (set! in-degree
           (ordered-map-set in-degree v (bitset-count preds))))
@@ -147,7 +147,7 @@
   ;; Find nodes with zero in-degree
   (define initial-queue
     (for/fold ([q (pvector-empty)])
-              ([v (in-bitset/rev vertices)])
+              ([v (in-bitset/reverse vertices)])
       (if (= (dict-ref in-degree v 0) 0)
           (pvector-cons-right q v)
           q)))
@@ -169,7 +169,7 @@
 
        (define-values (new-queue new-degrees)
          (for/fold ([q queue*] [d degrees])
-                   ([succ (in-bitset/rev (graph-successors-impl g v))])
+                   ([succ (in-bitset/reverse (graph-successors-impl g v))])
            (define new-deg (- (dict-ref d succ 0) 1))
            (define d* (ordered-map-set d succ new-deg))
            (if (= new-deg 0)

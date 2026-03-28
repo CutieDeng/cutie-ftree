@@ -44,7 +44,9 @@
    (lambda (m0 m1)
      (om-measure
       (om-measure-min-key m0)
-      (+ (om-measure-count m0) (om-measure-count m1))))
+      (+ (om-measure-count m0) (om-measure-count m1))
+      )
+     ) ; lambda: combine measures
    ) ; ft:config
   ) ; define ordered-map-core
 
@@ -143,7 +145,10 @@
 ;; 构建带正确 measure 的 node:2
 (define (make-node2 min-key x0 x1 depth)
   (node:2
-   (om-measure min-key (+ (node-count x0 depth) (node-count x1 depth)))
+   (om-measure
+    min-key
+    (+ (node-count x0 depth) (node-count x1 depth))
+    )
    x0
    x1)
   ) ; define make-node2
@@ -151,7 +156,10 @@
 ;; 构建带正确 measure 的 node:3
 (define (make-node3 min-key x0 x1 x2 depth)
   (node:3
-   (om-measure min-key (+ (node-count x0 depth) (node-count x1 depth) (node-count x2 depth)))
+   (om-measure
+    min-key
+    (+ (node-count x0 depth) (node-count x1 depth) (node-count x2 depth))
+    )
    x0
    x1
    x2)
@@ -160,7 +168,10 @@
 ;; 构建带正确 measure 的 ft:deep
 (define (make-ft-deep min-key left inner right depth)
   (ft:deep
-   (om-measure min-key (+ (digit-count left depth) (ft-count inner (add1 depth)) (digit-count right depth)))
+   (om-measure
+    min-key
+    (+ (digit-count left depth) (ft-count inner (add1 depth)) (digit-count right depth))
+    )
    left
    inner
    right)
@@ -178,7 +189,8 @@
     [_
      (match node
        [(node:2 _ x0 x1)
-        (define x1-key (ordered-map-min-key-node x1 (sub1 depth)))
+        (define x1-key
+          (ordered-map-min-key-node x1 (sub1 depth)))
         (define x1-cmp-rst (cmp-fn x1-key key))
         (match x1-cmp-rst
           [(or '= '<) (ordered-map-query-node:impl x1 cmp-fn key (sub1 depth))]
@@ -186,12 +198,14 @@
           ) ; match: x1-cmp-rst
         ]
        [(node:3 _ x0 x1 x2)
-        (define x2-key (ordered-map-min-key-node x2 (sub1 depth)))
+        (define x2-key
+          (ordered-map-min-key-node x2 (sub1 depth)))
         (define x2-cmp-rst (cmp-fn x2-key key))
         (match x2-cmp-rst
           [(or '= '<) (ordered-map-query-node:impl x2 cmp-fn key (sub1 depth))]
           ['>
-           (define x1-key (ordered-map-min-key-node x1 (sub1 depth)))
+           (define x1-key
+             (ordered-map-min-key-node x1 (sub1 depth)))
            (define x1-cmp-rst (cmp-fn x1-key key))
            (match x1-cmp-rst
              [(or '= '<) (ordered-map-query-node:impl x1 cmp-fn key (sub1 depth))]
@@ -219,7 +233,8 @@
           [(ft:empty) (f)]
           [_ (void)]
           ) ; match: inner emptiness
-        (define inner-v (ordered-map-min-key-ft inner (add1 depth)))
+        (define inner-v
+          (ordered-map-min-key-ft inner (add1 depth)))
         (define inner-v-cmp-rst (cmp-fn inner-v key))
         (match inner-v-cmp-rst
           [(or '= '<) (ordered-map-query-ft:impl inner cmp-fn key (add1 depth))]
@@ -233,7 +248,8 @@
   ) ; define ordered-map-query-ft:impl
 
 (define (ordered-map-query-digit:impl digit cmp-fn key depth)
-  (define l (reverse (digit-add-list digit '())))
+  (define l
+    (reverse (digit-add-list digit '())))
   (let loop0 ([l l])
     (match l
       [(cons lh l*)
@@ -263,14 +279,22 @@
        [(node:2 _ (and x0 (cons k0 _)) (and x1 (cons k1 _)))
         (define k1-cmp-rst (cmp-fn k1 key))
         (match k1-cmp-rst
-          ['= (if replace? (values (make-node2 k0 x0 (cons key value) 0) #f) (values node #f))]
-          ['< (ordered-map-size-changed? #t) (values (make-node3 k0 x0 x1 (cons key value) 0) #f)]
+          ['=
+           (if replace? (values (make-node2 k0 x0 (cons key value) 0) #f) (values node #f))]
+          ['<
+           (ordered-map-size-changed? #t)
+           (values (make-node3 k0 x0 x1 (cons key value) 0) #f)]
           ['>
            (define k0-cmp-rst (cmp-fn k0 key))
            (match k0-cmp-rst
-             ['= (if replace? (values (make-node2 key (cons key value) x1 0) #f) (values node #f))]
-             ['< (ordered-map-size-changed? #t) (values (make-node3 k0 x0 (cons key value) x1 0) #f)]
-             ['> (ordered-map-size-changed? #t) (values (make-node3 key (cons key value) x0 x1 0) #f)]
+             ['=
+              (if replace? (values (make-node2 key (cons key value) x1 0) #f) (values node #f))]
+             ['<
+              (ordered-map-size-changed? #t)
+              (values (make-node3 k0 x0 (cons key value) x1 0) #f)]
+             ['>
+              (ordered-map-size-changed? #t)
+              (values (make-node3 key (cons key value) x0 x1 0) #f)]
              ) ; match: k0-cmp-rst
            ]
           ) ; match: k1-cmp-rst
@@ -278,15 +302,20 @@
        [(node:3 _ (and x0 (cons k0 _)) (and x1 (cons k1 _)) (and x2 (cons k2 _)))
         (define k1-cmp-rst (cmp-fn k1 key))
         (match k1-cmp-rst
-          ['= (if replace? (values (make-node3 k0 x0 (cons key value) x2 0) #f) (values node #f))]
+          ['=
+           (if replace? (values (make-node3 k0 x0 (cons key value) x2 0) #f) (values node #f))]
           ['<
            (define k2-cmp-rst (cmp-fn k2 key))
            (match k2-cmp-rst
              ['= (if replace?
                      (values (make-node3 k0 x0 x1 (cons key value) 0) #f)
                      (values node #f))]
-             ['< (ordered-map-size-changed? #t) (values (make-node2 k0 x0 x1 0) (make-node2 k2 x2 (cons key value) 0))]
-             ['> (ordered-map-size-changed? #t) (values (make-node2 k0 x0 x1 0) (make-node2 key (cons key value) x2 0))]
+             ['<
+              (ordered-map-size-changed? #t)
+              (values (make-node2 k0 x0 x1 0) (make-node2 k2 x2 (cons key value) 0))]
+             ['>
+              (ordered-map-size-changed? #t)
+              (values (make-node2 k0 x0 x1 0) (make-node2 key (cons key value) x2 0))]
              ) ; match: k2-cmp-rst
            ]
           ['>
@@ -295,8 +324,12 @@
              ['= (if replace?
                      (values (make-node3 key (cons key value) x1 x2 0) #f)
                      (values node #f))]
-             ['< (ordered-map-size-changed? #t) (values (make-node2 k0 x0 (cons key value) 0) (make-node2 k1 x1 x2 0))]
-             ['> (ordered-map-size-changed? #t) (values (make-node2 key (cons key value) x0 0) (make-node2 k1 x1 x2 0))]
+             ['<
+              (ordered-map-size-changed? #t)
+              (values (make-node2 k0 x0 (cons key value) 0) (make-node2 k1 x1 x2 0))]
+             ['>
+              (ordered-map-size-changed? #t)
+              (values (make-node2 key (cons key value) x0 0) (make-node2 k1 x1 x2 0))]
              ) ; match: k0-cmp-rst
            ]
           ) ; match: k1-cmp-rst
@@ -309,20 +342,24 @@
       [(node:2 (om-measure k0 _) x0 x1)
         (define k1 (ordered-map-min-key-node x1 sub-depth))
         (match (cmp-fn k1 key)
-          [(or '= '<) (define-values (node0 node1)
-            (ordered-map-insert-node:impl x1 cmp-fn key value sub-depth replace?))
-            (cond
-              [(and (eq? x1 node0) (not node1)) (values node #f)]
-              [node1 (values (make-node3 k0 x0 node0 node1 sub-depth) #f)]
-              [(not node1) (values (make-node2 k0 x0 node0 sub-depth) #f)])
-          ]
-          ['> (define-values (node0 node1)
-            (ordered-map-insert-node:impl x0 cmp-fn key value sub-depth replace?))
-            (cond
-              [(and (eq? x0 node0) (not node1)) (values node #f)]
-              [node1 (values (make-node3 k0 node0 node1 x1 sub-depth) #f)]
-              [(not node1) (values (make-node2 k0 node0 x1 sub-depth) #f)])
-          ] ; match: cmp-fn k1 key for node:2
+          [(or '= '<)
+           (define-values (node0 node1)
+             (ordered-map-insert-node:impl x1 cmp-fn key value sub-depth replace?))
+           (cond
+             [(and (eq? x1 node0) (not node1)) (values node #f)]
+             [node1 (values (make-node3 k0 x0 node0 node1 sub-depth) #f)]
+             [(not node1) (values (make-node2 k0 x0 node0 sub-depth) #f)]
+             )
+           ]
+          ['>
+           (define-values (node0 node1)
+             (ordered-map-insert-node:impl x0 cmp-fn key value sub-depth replace?))
+           (cond
+             [(and (eq? x0 node0) (not node1)) (values node #f)]
+             [node1 (values (make-node3 k0 node0 node1 x1 sub-depth) #f)]
+             [(not node1) (values (make-node2 k0 node0 x1 sub-depth) #f)]
+             )
+           ] ; match: cmp-fn k1 key for node:2
         )
       ]
       [(node:3 (om-measure k0 _) x0 x1 x2)
@@ -331,52 +368,56 @@
           ['<
             (define k2 (ordered-map-min-key-node x2 sub-depth))
             (match (cmp-fn k2 key)
-              [(or '< '=) (define-values (node0 node1)
-                (ordered-map-insert-node:impl x2 cmp-fn key value sub-depth replace?))
-                (cond
-                  [(and (eq? x2 node0) (not node1)) (values node #f)]
-                  [node1 (values
-                    (make-node2 k0 x0 x1 sub-depth)
-                    (make-node2 (ordered-map-min-key-node node0 sub-depth) node0 node1 sub-depth))]
-                  [(not node1)
-                    (values (make-node3 k0 x0 x1 node0 sub-depth) #f)]
-                )
-              ]
-              ['> (define-values (node0 node1)
-                (ordered-map-insert-node:impl x1 cmp-fn key value sub-depth replace?))
-                (cond
-                  [(and (eq? x1 node0) (not node1)) (values node #f)]
-                  [node1 (values
-                    (make-node2 k0 x0 node0 sub-depth)
-                    (make-node2 (ordered-map-min-key-node node1 sub-depth) node1 x2 sub-depth))]
-                  [(not node1)
-                    (values (make-node3 k0 x0 node0 x2 sub-depth) #f)]
-                )
-              ]
+              [(or '< '=)
+               (define-values (node0 node1)
+                 (ordered-map-insert-node:impl x2 cmp-fn key value sub-depth replace?))
+               (cond
+                 [(and (eq? x2 node0) (not node1)) (values node #f)]
+                 [node1 (values
+                   (make-node2 k0 x0 x1 sub-depth)
+                   (make-node2 (ordered-map-min-key-node node0 sub-depth) node0 node1 sub-depth))]
+                 [(not node1)
+                  (values (make-node3 k0 x0 x1 node0 sub-depth) #f)]
+                 )
+               ]
+              ['>
+               (define-values (node0 node1)
+                 (ordered-map-insert-node:impl x1 cmp-fn key value sub-depth replace?))
+               (cond
+                 [(and (eq? x1 node0) (not node1)) (values node #f)]
+                 [node1 (values
+                   (make-node2 k0 x0 node0 sub-depth)
+                   (make-node2 (ordered-map-min-key-node node1 sub-depth) node1 x2 sub-depth))]
+                 [(not node1)
+                  (values (make-node3 k0 x0 node0 x2 sub-depth) #f)]
+                 )
+               ]
             )
           ]
-          ['= (define-values (node0 node1)
-            (ordered-map-insert-node:impl x1 cmp-fn key value sub-depth replace?))
-            (cond
-              [(and (eq? x1 node0) (not node1)) (values node #f)]
-              [node1 (values
-                (make-node2 k0 x0 node0 sub-depth)
-                (make-node2 (ordered-map-min-key-node node1 sub-depth) node1 x2 sub-depth))]
-              [(not node1)
-                (values (make-node3 k0 x0 node0 x2 sub-depth) #f)]
-            )
-          ]
-          ['> (define-values (node0 node1)
-            (ordered-map-insert-node:impl x0 cmp-fn key value sub-depth replace?))
-            (cond
-              [(and (eq? x0 node0) (not node1)) (values node #f)]
-              [node1 (values
-                (make-node2 k0 node0 node1 sub-depth)
-                (make-node2 k1 x1 x2 sub-depth))]
-              [(not node1)
-                (values (make-node3 k0 node0 x1 x2 sub-depth) #f)]
-            )
-          ]
+          ['=
+           (define-values (node0 node1)
+             (ordered-map-insert-node:impl x1 cmp-fn key value sub-depth replace?))
+           (cond
+             [(and (eq? x1 node0) (not node1)) (values node #f)]
+             [node1 (values
+               (make-node2 k0 x0 node0 sub-depth)
+               (make-node2 (ordered-map-min-key-node node1 sub-depth) node1 x2 sub-depth))]
+             [(not node1)
+              (values (make-node3 k0 x0 node0 x2 sub-depth) #f)]
+             )
+           ]
+          ['>
+           (define-values (node0 node1)
+             (ordered-map-insert-node:impl x0 cmp-fn key value sub-depth replace?))
+           (cond
+             [(and (eq? x0 node0) (not node1)) (values node #f)]
+             [node1 (values
+               (make-node2 k0 node0 node1 sub-depth)
+               (make-node2 k1 x1 x2 sub-depth))]
+             [(not node1)
+              (values (make-node3 k0 node0 x1 x2 sub-depth) #f)]
+             )
+           ]
         ) ; match: cmp-fn k1 key for node:3
       ]
       ) ; match: node at depth > 1
@@ -392,16 +433,22 @@
         [0
          (match-define (cons k0 _) x)
          (match (cmp-fn k0 key)
-           ['< (ordered-map-size-changed? #t) (make-ft-deep k0 (digit:1 x) (ft:empty) (digit:1 (cons key value)) 0)]
+           ['<
+            (ordered-map-size-changed? #t)
+            (make-ft-deep k0 (digit:1 x) (ft:empty) (digit:1 (cons key value)) 0)]
            ['= (if replace? (ft:single (cons key value)) ft)]
-           ['> (ordered-map-size-changed? #t) (make-ft-deep key (digit:1 (cons key value)) (ft:empty) (digit:1 x) 0)]
+           ['>
+            (ordered-map-size-changed? #t)
+            (make-ft-deep key (digit:1 (cons key value)) (ft:empty) (digit:1 x) 0)]
            ) ; match: cmp-fn k0 key
         ]
         [_
-          (define-values (node0 node1) (ordered-map-insert-node:impl x cmp-fn key value depth replace?))
+          (define-values (node0 node1)
+            (ordered-map-insert-node:impl x cmp-fn key value depth replace?))
           (cond
             [(and (eq? x node0) (not node1)) ft]
-            [node1 (make-ft-deep (ordered-map-min-key-node node0 depth) (digit:1 node0) (ft:empty) (digit:1 node1) depth)]
+            [node1
+             (make-ft-deep (ordered-map-min-key-node node0 depth) (digit:1 node0) (ft:empty) (digit:1 node1) depth)]
             [(not node1) (ft:single node0)]
           )
         ]
@@ -418,8 +465,10 @@
            (match right^
              [`(,x0 ,x1 ,x2 ,x3 ,x4)
               (define right^^ (digit:2 x3 x4))
-              (define node0 (make-node3 (ordered-map-min-key-node x0 depth) x0 x1 x2 depth))
-              (define inner^ (consR:impl ordered-map-core inner node0 (add1 depth)))
+              (define node0
+                (make-node3 (ordered-map-min-key-node x0 depth) x0 x1 x2 depth))
+              (define inner^
+                (consR:impl ordered-map-core inner node0 (add1 depth)))
               (make-ft-deep o left inner^ right^^ depth)]
              [r
               (define right^^ (list->digit r depth))
@@ -439,8 +488,10 @@
               (match left^
                 [`(,x0 ,x1 ,x2 ,x3 ,x4)
                  (define left^^ (digit:2 x0 x1))
-                 (define node0 (make-node3 (ordered-map-min-key-node x2 depth) x2 x3 x4 depth))
-                 (define inner^ (consL:impl ordered-map-core inner node0 (add1 depth)))
+                 (define node0
+                   (make-node3 (ordered-map-min-key-node x2 depth) x2 x3 x4 depth))
+                 (define inner^
+                   (consL:impl ordered-map-core inner node0 (add1 depth)))
                  (make-ft-deep o left^^ inner^ right depth)]
                 [l
                  (define left^^ (list->digit l depth))
@@ -450,10 +501,12 @@
              ) ; cond: left insert result with empty inner
            ]
           [_
-           (define inner-v (ordered-map-min-key-ft inner (add1 depth)))
+           (define inner-v
+             (ordered-map-min-key-ft inner (add1 depth)))
            (match (cmp-fn inner-v key)
              [(or '< '=)
-              (define inner^ (ordered-map-insert-ft:impl inner cmp-fn key value (add1 depth) replace?))
+              (define inner^
+                (ordered-map-insert-ft:impl inner cmp-fn key value (add1 depth) replace?))
               (if (eq? inner inner^) ft (make-ft-deep o left inner^ right depth))]
              ['>
               (define left^
@@ -462,10 +515,12 @@
                 [(eq? left left^) ft]
                 [else
                  (match left^
-                   [`(,x0 ,x1 ,x2 ,x3 ,x4)
+                  [`(,x0 ,x1 ,x2 ,x3 ,x4)
                     (define left^^ (digit:2 x0 x1))
-                    (define node0 (make-node3 (ordered-map-min-key-node x2 depth) x2 x3 x4 depth))
-                    (define inner^ (consL:impl ordered-map-core inner node0 (add1 depth)))
+                    (define node0
+                      (make-node3 (ordered-map-min-key-node x2 depth) x2 x3 x4 depth))
+                    (define inner^
+                      (consL:impl ordered-map-core inner node0 (add1 depth)))
                     (make-ft-deep o left^^ inner^ right depth)]
                    [l
                     (define left^^ (list->digit l depth))
@@ -491,17 +546,23 @@
       (match digit
         [(digit:1 (and x0 (cons k0 _)))
           (match (cmp-fn k0 key)
-            ['< (ordered-map-size-changed? #t) (list x0 kv)]
+            ['<
+             (ordered-map-size-changed? #t)
+             (list x0 kv)]
             ['= (if replace? (list kv) digit)]
           )
         ]
         [(digit:2 (and x0 (cons k0 _)) (and x1 (cons k1 _)))
           (match (cmp-fn k1 key)
-            ['< (ordered-map-size-changed? #t) (list x0 x1 kv)]
+            ['<
+             (ordered-map-size-changed? #t)
+             (list x0 x1 kv)]
             ['= (if replace? (list x0 kv) digit)]
             ['> 
               (match (cmp-fn k0 key)
-                ['< (ordered-map-size-changed? #t) (list x0 kv x1)]
+                ['<
+                 (ordered-map-size-changed? #t)
+                 (list x0 kv x1)]
                 ['= (if replace? (list kv x1) digit)]
               )]
           )
@@ -510,14 +571,20 @@
           (match (cmp-fn k1 key)
             ['< 
               (match (cmp-fn k2 key)
-                ['< (ordered-map-size-changed? #t) (list x0 x1 x2 kv)]
+                ['<
+                 (ordered-map-size-changed? #t)
+                 (list x0 x1 x2 kv)]
                 ['= (if replace? (list x0 x1 kv) digit)]
-                ['> (ordered-map-size-changed? #t) (list x0 x1 kv x2)]
+                ['>
+                 (ordered-map-size-changed? #t)
+                 (list x0 x1 kv x2)]
               )]
             ['= (if replace? (list x0 kv x2) digit)]
             ['>
               (match (cmp-fn k0 key)
-                ['< (ordered-map-size-changed? #t) (list x0 kv x1 x2)]
+                ['<
+                 (ordered-map-size-changed? #t)
+                 (list x0 kv x1 x2)]
                 ['= (if replace? (list kv x1 x2) digit)]
               )]
           )
@@ -526,18 +593,26 @@
           (match (cmp-fn k2 key)
             ['< 
               (match (cmp-fn k3 key)
-                ['< (ordered-map-size-changed? #t) (list x0 x1 x2 x3 kv)]
+                ['<
+                 (ordered-map-size-changed? #t)
+                 (list x0 x1 x2 x3 kv)]
                 ['= (if replace? (list x0 x1 x2 kv) digit)]
-                ['> (ordered-map-size-changed? #t) (list x0 x1 x2 kv x3)]
+                ['>
+                 (ordered-map-size-changed? #t)
+                 (list x0 x1 x2 kv x3)]
               )]
             ['= (if replace? (list x0 x1 kv x3) digit)]
             ['> 
               (match (cmp-fn k1 key)
-                ['< (ordered-map-size-changed? #t) (list x0 x1 kv x2 x3)]
+                ['<
+                 (ordered-map-size-changed? #t)
+                 (list x0 x1 kv x2 x3)]
                 ['= (if replace? (list x0 kv x2 x3) digit)]
                 ['>
                   (match (cmp-fn k0 key)
-                    ['< (ordered-map-size-changed? #t) (list x0 kv x1 x2 x3)]
+                    ['<
+                     (ordered-map-size-changed? #t)
+                     (list x0 kv x1 x2 x3)]
                     ['= (if replace? (list kv x1 x2 x3) digit)]
                   )]
               )]
@@ -548,7 +623,8 @@
     [_
       (match digit
         [(digit:1 x0)
-          (define-values (node0 node1) (ordered-map-insert-node:impl x0 cmp-fn key value depth replace?))
+          (define-values (node0 node1)
+            (ordered-map-insert-node:impl x0 cmp-fn key value depth replace?))
           (cond
             [(and (eq? node0 x0) (not node1)) digit]
             [node1 (list node0 node1)]
@@ -559,7 +635,8 @@
           (define k1 (ordered-map-min-key-node x1 depth))
           (match (cmp-fn k1 key)
             [(or '< '=)
-              (define-values (node0 node1) (ordered-map-insert-node:impl x1 cmp-fn key value depth replace?))
+              (define-values (node0 node1)
+                (ordered-map-insert-node:impl x1 cmp-fn key value depth replace?))
               (cond
                 [(and (eq? x1 node0) (not node1)) digit]
                 [node1 (list x0 node0 node1)]
@@ -567,7 +644,8 @@
               )
             ]
             ['> 
-              (define-values (node0 node1) (ordered-map-insert-node:impl x0 cmp-fn key value depth replace?))
+              (define-values (node0 node1)
+                (ordered-map-insert-node:impl x0 cmp-fn key value depth replace?))
               (cond
                 [(and (eq? x0 node0) (not node1)) digit]
                 [node1 (list node0 node1 x1)]
@@ -582,7 +660,8 @@
             ['< (=> f)
               (match (cmp-fn (ordered-map-min-key-node x2 depth) key)
                 [(or '< '=) 
-                  (define-values (node0 node1) (ordered-map-insert-node:impl x2 cmp-fn key value depth replace?))
+                  (define-values (node0 node1)
+                    (ordered-map-insert-node:impl x2 cmp-fn key value depth replace?))
                   (cond
                     [(and (eq? x2 node0) (not node1)) digit]
                     [node1 (list x0 x1 node0 node1)]
@@ -593,7 +672,8 @@
               )
             ]
             [(or '< '=)
-              (define-values (node0 node1) (ordered-map-insert-node:impl x1 cmp-fn key value depth replace?))
+              (define-values (node0 node1)
+                (ordered-map-insert-node:impl x1 cmp-fn key value depth replace?))
               (cond
                 [(and (eq? x1 node0) (not node1)) digit]
                 [node1 (list x0 node0 node1 x2)]
@@ -601,7 +681,8 @@
               )
             ]
             ['> 
-              (define-values (node0 node1) (ordered-map-insert-node:impl x0 cmp-fn key value depth replace?))
+              (define-values (node0 node1)
+                (ordered-map-insert-node:impl x0 cmp-fn key value depth replace?))
               (cond
                 [(and (eq? x0 node0) (not node1)) digit]
                 [node1 (list node0 node1 x1 x2)]
@@ -611,11 +692,14 @@
           )
         ]
         [(digit:4 x0 x1 x2 x3)
-          (match (cmp-fn (ordered-map-min-key-node x2 depth) key)
+          (define k2 (ordered-map-min-key-node x2 depth))
+          (match (cmp-fn k2 key)
             ['< (=> f)
-              (match (cmp-fn (ordered-map-min-key-node x3 depth) key)
+              (define k3 (ordered-map-min-key-node x3 depth))
+              (match (cmp-fn k3 key)
                 [(or '< '=) 
-                  (define-values (node0 node1) (ordered-map-insert-node:impl x3 cmp-fn key value depth replace?))
+                  (define-values (node0 node1)
+                    (ordered-map-insert-node:impl x3 cmp-fn key value depth replace?))
                   (cond
                     [(and (eq? x3 node0) (not node1)) digit]
                     [node1 (list x0 x1 x2 node0 node1)]
@@ -626,7 +710,8 @@
               )
             ]
             [(or '< '=)
-              (define-values (node0 node1) (ordered-map-insert-node:impl x2 cmp-fn key value depth replace?))
+              (define-values (node0 node1)
+                (ordered-map-insert-node:impl x2 cmp-fn key value depth replace?))
               (cond
                 [(and (eq? x2 node0) (not node1)) digit]
                 [node1 (list x0 x1 node0 node1 x3)]
@@ -634,9 +719,10 @@
               )
             ]
             ['>
-              (match (cmp-fn (ordered-map-min-key-node x1 depth) key)
+              (define k1 (ordered-map-min-key-node x1 depth))
+              (match (cmp-fn k1 key)
                 [(or '< '=)
-                  (define-values (node0 node1) 
+                  (define-values (node0 node1)
                     (ordered-map-insert-node:impl x1 cmp-fn key value depth replace?))
                   (cond
                     [(and (eq? x1 node0) (not node1)) digit]
@@ -677,7 +763,8 @@
 
 (define (ordered-map-insert ordl key value replace?)
   (match-define (ordered-map cmp-fn k) ordl)
-  (define k^ (ordered-map-insert-ft-wrap k cmp-fn key value replace?))
+  (define k^
+    (ordered-map-insert-ft-wrap k cmp-fn key value replace?))
   (cond
     [(eq? k k^) ordl]
     [else (ordered-map cmp-fn k^)]
@@ -1019,7 +1106,9 @@
      (match left
        [(digit:1 x0)
         (define-values (r0 r1) (ordered-map-node-mergeR x0 subright depth))
-        (if r1 (make-ft-deep o (digit:1 r0) (ft:empty) (digit:1 r1) depth) (ft:single r0))]
+        (if r1
+            (make-ft-deep o (digit:1 r0) (ft:empty) (digit:1 r1) depth)
+            (ft:single r0))]
        [(digit:2 x0 x1)
         (define-values (r0 r1) (ordered-map-node-mergeR x1 subright depth))
         (make-ft-deep o (digit:1 x0) (ft:empty) (if r1 (digit:2 r0 r1) (digit:1 r0)) depth)]
@@ -1032,7 +1121,8 @@
        ) ; match: left
     ]
     [_
-     (define-values (r inner^) (hdR:impl ordered-map-core inner (add1 depth)))
+     (define-values (r inner^)
+       (hdR:impl ordered-map-core inner (add1 depth)))
      (define-values (r0 r1) (ordered-map-node-mergeR r subright depth))
      (make-ft-deep o left inner^ (if r1 (digit:2 r0 r1) (digit:1 r0)) depth)]
     ) ; match: inner
@@ -1044,7 +1134,9 @@
      (match right
        [(digit:1 x0)
         (define-values (r0 r1) (ordered-map-node-mergeL x0 subleft depth))
-        (if r1 (make-ft-deep (ordered-map-min-key-node r0 depth) (digit:1 r0) (ft:empty) (digit:1 r1) depth) (ft:single r0))]
+        (if r1
+            (make-ft-deep (ordered-map-min-key-node r0 depth) (digit:1 r0) (ft:empty) (digit:1 r1) depth)
+            (ft:single r0))]
        [(digit:2 x0 x1)
         (define-values (r0 r1) (ordered-map-node-mergeL x0 subleft depth))
         (make-ft-deep (ordered-map-min-key-node r0 depth) (if r1 (digit:2 r0 r1) (digit:1 r0)) (ft:empty) (digit:1 x1) depth)]
@@ -1057,7 +1149,8 @@
        ) ; match: right
     ]
     [_
-     (define-values (l inner^) (hdL:impl ordered-map-core inner (add1 depth)))
+     (define-values (l inner^)
+       (hdL:impl ordered-map-core inner (add1 depth)))
      (define-values (r0 r1) (ordered-map-node-mergeL l subleft depth))
      (make-ft-deep (ordered-map-min-key-node r0 depth) (if r1 (digit:2 r0 r1) (digit:1 r0)) inner^ right depth)]
     ) ; match: inner
@@ -1218,14 +1311,16 @@
 (define (ordered-map-delete ft key)
   (match-define (ordered-map cmp-fn ft^) ft)
   (match-define-values (ft^^ ret) (ordered-map-delete-ft-wrap ft^ cmp-fn key))
-  (values (if (eq? ft^ ft^^) ft (ordered-map cmp-fn ft^^)) ret)) ; define ordered-map-delete
+  (values (if (eq? ft^ ft^^) ft (ordered-map cmp-fn ft^^)) ret)
+  ) ; define ordered-map-delete
 
 ;; ========================================
 ;; Constructor
 ;; ========================================
 
 (define (ordered-map-empty cmp-fn)
-  (ordered-map cmp-fn (ft:empty)))
+  (ordered-map cmp-fn (ft:empty))
+  ) ; define ordered-map-empty
 
 ;; ----------------------------------------
 ;; Quick initialization (like hash)
@@ -1306,7 +1401,8 @@
     [(digit:2 x0 x1)
      (define k1 (ordered-map-min-key-node x1 depth))
      (match (cmp-fn k1 key)
-       [(or '< '=) (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
+       [(or '< '=)
+        (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
        ['> (ordered-map-rank-node x0 cmp-fn key depth acc)]
        )]
     [(digit:3 x0 x1 x2)
@@ -1315,12 +1411,15 @@
        ['<
         (define k2 (ordered-map-min-key-node x2 depth))
         (match (cmp-fn k2 key)
-          [(or '< '=) (ordered-map-rank-node x2 cmp-fn key depth (+ acc (node-count x0 depth) (node-count x1 depth)))]
-          ['> (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
+          [(or '< '=)
+           (ordered-map-rank-node x2 cmp-fn key depth (+ acc (node-count x0 depth) (node-count x1 depth)))]
+          ['>
+           (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
           )]
        [(or '= '>)
         (match (cmp-fn k1 key)
-          ['= (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
+          ['=
+           (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
           ['> (ordered-map-rank-node x0 cmp-fn key depth acc)]
           )]
        )]
@@ -1333,18 +1432,23 @@
           ['<
            (define k3 (ordered-map-min-key-node x3 depth))
            (match (cmp-fn k3 key)
-             [(or '< '=) (ordered-map-rank-node x3 cmp-fn key depth (+ acc (node-count x0 depth) (node-count x1 depth) (node-count x2 depth)))]
-             ['> (ordered-map-rank-node x2 cmp-fn key depth (+ acc (node-count x0 depth) (node-count x1 depth)))]
+             [(or '< '=)
+              (ordered-map-rank-node x3 cmp-fn key depth (+ acc (node-count x0 depth) (node-count x1 depth) (node-count x2 depth)))]
+             ['>
+              (ordered-map-rank-node x2 cmp-fn key depth (+ acc (node-count x0 depth) (node-count x1 depth)))]
              )]
           [(or '= '>)
            (match (cmp-fn k2 key)
-             ['= (ordered-map-rank-node x2 cmp-fn key depth (+ acc (node-count x0 depth) (node-count x1 depth)))]
-             ['> (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
+             ['=
+              (ordered-map-rank-node x2 cmp-fn key depth (+ acc (node-count x0 depth) (node-count x1 depth)))]
+             ['>
+              (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
              )]
           )]
        [(or '= '>)
         (match (cmp-fn k1 key)
-          ['= (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
+          ['=
+           (ordered-map-rank-node x1 cmp-fn key depth (+ acc (node-count x0 depth)))]
           ['> (ordered-map-rank-node x0 cmp-fn key depth acc)]
           )]
        )]
@@ -1357,9 +1461,10 @@
     [_
      (match node
        [(node:2 _ x0 x1)
-        (define k1 (ordered-map-min-key-node x1 (sub1 depth)))
-        (match (cmp-fn k1 key)
-          [(or '< '=) (ordered-map-rank-node x1 cmp-fn key (sub1 depth) (+ acc (node-count x0 (sub1 depth))))]
+       (define k1 (ordered-map-min-key-node x1 (sub1 depth)))
+       (match (cmp-fn k1 key)
+          [(or '< '=)
+           (ordered-map-rank-node x1 cmp-fn key (sub1 depth) (+ acc (node-count x0 (sub1 depth))))]
           ['> (ordered-map-rank-node x0 cmp-fn key (sub1 depth) acc)]
           )]
        [(node:3 _ x0 x1 x2)
@@ -1368,12 +1473,15 @@
           ['<
            (define k2 (ordered-map-min-key-node x2 (sub1 depth)))
            (match (cmp-fn k2 key)
-             [(or '< '=) (ordered-map-rank-node x2 cmp-fn key (sub1 depth) (+ acc (node-count x0 (sub1 depth)) (node-count x1 (sub1 depth))))]
-             ['> (ordered-map-rank-node x1 cmp-fn key (sub1 depth) (+ acc (node-count x0 (sub1 depth))))]
+             [(or '< '=)
+              (ordered-map-rank-node x2 cmp-fn key (sub1 depth) (+ acc (node-count x0 (sub1 depth)) (node-count x1 (sub1 depth))))]
+             ['>
+              (ordered-map-rank-node x1 cmp-fn key (sub1 depth) (+ acc (node-count x0 (sub1 depth))))]
              )]
           [(or '= '>)
            (match (cmp-fn k1 key)
-             ['= (ordered-map-rank-node x1 cmp-fn key (sub1 depth) (+ acc (node-count x0 (sub1 depth))))]
+             ['=
+              (ordered-map-rank-node x1 cmp-fn key (sub1 depth) (+ acc (node-count x0 (sub1 depth))))]
              ['> (ordered-map-rank-node x0 cmp-fn key (sub1 depth) acc)]
              )]
           )]
@@ -1389,7 +1497,9 @@
   (cond
     [(< rank 0) #f]
     [(>= rank (ft-count ft 0)) #f]
-    [else (ordered-map-select-ft ft rank 0)]))
+    [else (ordered-map-select-ft ft rank 0)]
+    ) ; cond: rank bounds
+  ) ; define ordered-map-select
 
 (define (ordered-map-select-ft ft rank depth)
   (match ft
@@ -1407,8 +1517,10 @@
            (ordered-map-select-ft inner (- rank left-count) (add1 depth))]
           [else
            (ordered-map-select-digit right (- rank left-inner-count) depth)]
-          )]
-       )]
+          ) ; cond: inner vs right
+        ]
+       ) ; cond: left vs inner/right
+     ]
     ) ; match: ft
   ) ; define ordered-map-select-ft
 
@@ -1419,7 +1531,8 @@
      (define c0 (node-count x0 depth))
      (if (< rank c0)
          (ordered-map-select-node x0 rank depth)
-         (ordered-map-select-node x1 (- rank c0) depth))]
+         (ordered-map-select-node x1 (- rank c0) depth))
+     ]
     [(digit:3 x0 x1 x2)
      (define c0 (node-count x0 depth))
      (cond
@@ -1428,7 +1541,8 @@
         (define c1 (node-count x1 depth))
         (if (< rank (+ c0 c1))
             (ordered-map-select-node x1 (- rank c0) depth)
-            (ordered-map-select-node x2 (- rank c0 c1) depth))]
+            (ordered-map-select-node x2 (- rank c0 c1) depth))
+        ]
        )]
     [(digit:4 x0 x1 x2 x3)
      (define c0 (node-count x0 depth))
@@ -1442,7 +1556,8 @@
            (define c2 (node-count x2 depth))
            (if (< rank (+ c0 c1 c2))
                (ordered-map-select-node x2 (- rank c0 c1) depth)
-               (ordered-map-select-node x3 (- rank c0 c1 c2) depth))]
+               (ordered-map-select-node x3 (- rank c0 c1 c2) depth))
+           ]
           )]
        )]
     ) ; match: digit
@@ -1457,7 +1572,8 @@
         (define c0 (node-count x0 (sub1 depth)))
         (if (< rank c0)
             (ordered-map-select-node x0 rank (sub1 depth))
-            (ordered-map-select-node x1 (- rank c0) (sub1 depth)))]
+            (ordered-map-select-node x1 (- rank c0) (sub1 depth)))
+        ]
        [(node:3 _ x0 x1 x2)
         (define c0 (node-count x0 (sub1 depth)))
         (cond
@@ -1466,7 +1582,8 @@
            (define c1 (node-count x1 (sub1 depth)))
            (if (< rank (+ c0 c1))
                (ordered-map-select-node x1 (- rank c0) (sub1 depth))
-               (ordered-map-select-node x2 (- rank c0 c1) (sub1 depth)))]
+               (ordered-map-select-node x2 (- rank c0 c1) (sub1 depth)))
+           ]
           )]
        ) ; match: node
      ]
@@ -1490,10 +1607,10 @@
         (define inner-count (ft-count inner (add1 depth)))
         (+ left-count inner-count (ordered-map-count-less-than-digit right cmp-fn key depth))]
        [(or '= '>)
-        (match inner
-          [(ft:empty)
-           (ordered-map-count-less-than-digit left cmp-fn key depth)]
-          [_
+       (match inner
+         [(ft:empty)
+          (ordered-map-count-less-than-digit left cmp-fn key depth)]
+         [_
            (define inner-v (ordered-map-min-key-ft inner (add1 depth)))
            (match (cmp-fn inner-v key)
              ['<
@@ -1513,7 +1630,8 @@
     [(digit:2 x0 x1)
      (define k1 (ordered-map-min-key-node x1 depth))
      (match (cmp-fn k1 key)
-       ['< (+ (node-count x0 depth) (ordered-map-count-less-than-node x1 cmp-fn key depth))]
+       ['<
+        (+ (node-count x0 depth) (ordered-map-count-less-than-node x1 cmp-fn key depth))]
        [(or '= '>) (ordered-map-count-less-than-node x0 cmp-fn key depth)]
        )]
     [(digit:3 x0 x1 x2)
@@ -1522,8 +1640,10 @@
        ['<
         (define k2 (ordered-map-min-key-node x2 depth))
         (match (cmp-fn k2 key)
-          ['< (+ (node-count x0 depth) (node-count x1 depth) (ordered-map-count-less-than-node x2 cmp-fn key depth))]
-          [(or '= '>) (+ (node-count x0 depth) (ordered-map-count-less-than-node x1 cmp-fn key depth))]
+          ['<
+           (+ (node-count x0 depth) (node-count x1 depth) (ordered-map-count-less-than-node x2 cmp-fn key depth))]
+          [(or '= '>)
+           (+ (node-count x0 depth) (ordered-map-count-less-than-node x1 cmp-fn key depth))]
           )]
        [(or '= '>) (ordered-map-count-less-than-node x0 cmp-fn key depth)]
        )]
@@ -1536,12 +1656,15 @@
           ['<
            (define k3 (ordered-map-min-key-node x3 depth))
            (match (cmp-fn k3 key)
-             ['< (+ (node-count x0 depth) (node-count x1 depth) (node-count x2 depth)
-                    (ordered-map-count-less-than-node x3 cmp-fn key depth))]
-             [(or '= '>) (+ (node-count x0 depth) (node-count x1 depth)
-                            (ordered-map-count-less-than-node x2 cmp-fn key depth))]
+             ['<
+              (+ (node-count x0 depth) (node-count x1 depth) (node-count x2 depth)
+                 (ordered-map-count-less-than-node x3 cmp-fn key depth))]
+             [(or '= '>)
+              (+ (node-count x0 depth) (node-count x1 depth)
+                 (ordered-map-count-less-than-node x2 cmp-fn key depth))]
              )]
-          [(or '= '>) (+ (node-count x0 depth) (ordered-map-count-less-than-node x1 cmp-fn key depth))]
+          [(or '= '>)
+           (+ (node-count x0 depth) (ordered-map-count-less-than-node x1 cmp-fn key depth))]
           )]
        [(or '= '>) (ordered-map-count-less-than-node x0 cmp-fn key depth)]
        )]
@@ -1556,7 +1679,8 @@
        [(node:2 _ x0 x1)
         (define k1 (ordered-map-min-key-node x1 (sub1 depth)))
         (match (cmp-fn k1 key)
-          ['< (+ (node-count x0 (sub1 depth)) (ordered-map-count-less-than-node x1 cmp-fn key (sub1 depth)))]
+          ['<
+           (+ (node-count x0 (sub1 depth)) (ordered-map-count-less-than-node x1 cmp-fn key (sub1 depth)))]
           [(or '= '>) (ordered-map-count-less-than-node x0 cmp-fn key (sub1 depth))]
           )]
        [(node:3 _ x0 x1 x2)
@@ -1565,10 +1689,12 @@
           ['<
            (define k2 (ordered-map-min-key-node x2 (sub1 depth)))
            (match (cmp-fn k2 key)
-             ['< (+ (node-count x0 (sub1 depth)) (node-count x1 (sub1 depth))
-                    (ordered-map-count-less-than-node x2 cmp-fn key (sub1 depth)))]
-             [(or '= '>) (+ (node-count x0 (sub1 depth))
-                            (ordered-map-count-less-than-node x1 cmp-fn key (sub1 depth)))]
+             ['<
+              (+ (node-count x0 (sub1 depth)) (node-count x1 (sub1 depth))
+                 (ordered-map-count-less-than-node x2 cmp-fn key (sub1 depth)))]
+             [(or '= '>)
+              (+ (node-count x0 (sub1 depth))
+                 (ordered-map-count-less-than-node x1 cmp-fn key (sub1 depth)))]
              )]
           [(or '= '>) (ordered-map-count-less-than-node x0 cmp-fn key (sub1 depth))]
           )]
@@ -1581,10 +1707,14 @@
   (if (ordered-map-query om key) #t #f))
 
 (define (ordered-map-keys om)
-  (for/list ([kv (in-ordered-map om)]) (car kv)))
+  (for/list ([kv (in-ordered-map om)])
+    (car kv))
+  ) ; define ordered-map-keys
 
 (define (ordered-map-values om)
-  (for/list ([kv (in-ordered-map om)]) (cdr kv)))
+  (for/list ([kv (in-ordered-map om)])
+    (cdr kv))
+  ) ; define ordered-map-values
 
 ;; ========================================
 ;; Sequence support
@@ -1876,7 +2006,8 @@
     [_
      (match node
        [(node:2 _ x0 x1)
-        (define x1-key (ordered-map-min-key-node x1 (sub1 depth)))
+        (define x1-key
+          (ordered-map-min-key-node x1 (sub1 depth)))
         (define x1-cmp-rst (cmp-fn x1-key key))
         (match* (x1-cmp-rst mode)
           [('= (or '>= '<= '>)) (ordered-map-query-weak-node:impl x1 cmp-fn key mode (sub1 depth))]
@@ -1884,32 +2015,38 @@
           [(_ (or '< '<=))
            (ordered-map-query-weak-node:impl x0 cmp-fn key mode (sub1 depth))]
           [(_ _)
-           (define tmp (ordered-map-query-weak-node:impl x0 cmp-fn key mode (sub1 depth)))
+           (define tmp
+             (ordered-map-query-weak-node:impl x0 cmp-fn key mode (sub1 depth)))
            (if tmp tmp (ordered-map-query-weak-node:impl x1 cmp-fn key mode (sub1 depth)))]
           ) ; match*: x1-cmp-rst mode
         ]
        [(node:3 _ x0 x1 x2)
-        (define x2-key (ordered-map-min-key-node x2 (sub1 depth)))
+        (define x2-key
+          (ordered-map-min-key-node x2 (sub1 depth)))
         (define x2-cmp-rst (cmp-fn x2-key key))
         (match* (x2-cmp-rst mode)
           [('= (or '>= '<= '>)) (ordered-map-query-weak-node:impl x2 cmp-fn key mode (sub1 depth))]
           [('< _) (ordered-map-query-weak-node:impl x2 cmp-fn key mode (sub1 depth))]
           [(_ _)
-           (define x1-key (ordered-map-min-key-node x1 (sub1 depth)))
+           (define x1-key
+             (ordered-map-min-key-node x1 (sub1 depth)))
            (define x1-cmp-rst (cmp-fn x1-key key))
            (match* (x1-cmp-rst mode)
              [('= (or '>= '<=)) (ordered-map-query-weak-node:impl x1 cmp-fn key mode (sub1 depth))]
              [('= '>)
-              (define tmp (ordered-map-query-weak-node:impl x1 cmp-fn key mode (sub1 depth)))
+              (define tmp
+                (ordered-map-query-weak-node:impl x1 cmp-fn key mode (sub1 depth)))
               (if tmp tmp (ordered-map-query-weak-node:impl x2 cmp-fn key mode (sub1 depth)))]
              [('< (or '<= '<)) (ordered-map-query-weak-node:impl x1 cmp-fn key mode (sub1 depth))]
              [('< (or '>= '>))
-              (define tmp (ordered-map-query-weak-node:impl x1 cmp-fn key mode (sub1 depth)))
+              (define tmp
+                (ordered-map-query-weak-node:impl x1 cmp-fn key mode (sub1 depth)))
               (if tmp tmp (ordered-map-query-weak-node:impl x2 cmp-fn key mode (sub1 depth)))]
              [('= '<) (ordered-map-query-weak-node:impl x0 cmp-fn key mode (sub1 depth))]
              [('> (or '<= '<)) (ordered-map-query-weak-node:impl x0 cmp-fn key mode (sub1 depth))]
              [('> (or '>= '>))
-              (define tmp (ordered-map-query-weak-node:impl x0 cmp-fn key mode (sub1 depth)))
+              (define tmp
+                (ordered-map-query-weak-node:impl x0 cmp-fn key mode (sub1 depth)))
               (if tmp tmp (ordered-map-query-weak-node:impl x1 cmp-fn key mode (sub1 depth)))]
              ) ; match*: x1-cmp-rst mode
            ]
@@ -1942,18 +2079,21 @@
              ) ; match: mode
            ]
           [_
-           (define inner-v (ordered-map-min-key-ft inner (add1 depth)))
+           (define inner-v
+             (ordered-map-min-key-ft inner (add1 depth)))
            (define inner-v-cmp-rst (cmp-fn inner-v key))
            (match* (inner-v-cmp-rst mode)
              [('= (or '<= '>= '>)) (ordered-map-query-weak-ft:impl inner cmp-fn key mode (add1 depth))]
              [('< (or '>= '>))
-              (define tmp (ordered-map-query-weak-ft:impl inner cmp-fn key mode (add1 depth)))
+              (define tmp
+                (ordered-map-query-weak-ft:impl inner cmp-fn key mode (add1 depth)))
               (if tmp tmp (ordered-map-query-weak-digit:impl right cmp-fn key mode depth))]
              [('< _) (ordered-map-query-weak-ft:impl inner cmp-fn key mode (add1 depth))]
              [(_ (or '<= '<))
               (ordered-map-query-weak-digit:impl left cmp-fn key mode depth)]
              [(_ _)
-              (define tmp (ordered-map-query-weak-digit:impl left cmp-fn key mode depth))
+              (define tmp
+                (ordered-map-query-weak-digit:impl left cmp-fn key mode depth))
               (if tmp tmp (ordered-map-query-weak-ft:impl inner cmp-fn key mode (add1 depth)))]
              ) ; match*: inner-v-cmp-rst mode
            ]

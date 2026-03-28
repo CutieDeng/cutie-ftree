@@ -69,8 +69,8 @@
     (set! on-stack (bitset-add on-stack v))
 
     ;; Visit successors - graph-successors-impl returns bitset of vertex vals
-    ;; Use in-bitset/rev for ~5x better iteration performance
-    (for ([w (in-bitset/rev (graph-successors-impl g v))])
+    ;; Use in-bitset/reverse for ~5x better iteration performance
+    (for ([w (in-bitset/reverse (graph-successors-impl g v))])
       (cond
         [(not (ordered-map-has-key? index w))
          ;; w not yet visited
@@ -99,8 +99,8 @@
       (set! stack new-stack)
       (set! sccs (pvector-cons-right sccs scc))))
 
-  ;; Visit all vertices (use in-bitset/rev for ~5x better performance)
-  (for ([v (in-bitset/rev vertices)])
+  ;; Visit all vertices (use in-bitset/reverse for ~5x better performance)
+  (for ([v (in-bitset/reverse vertices)])
     (unless (ordered-map-has-key? index v)
       (strongconnect v)))
 
@@ -124,16 +124,16 @@
     (for/fold ([m (ordered-map-empty integer-compare)])
               ([scc (in-pvector sccs)]
                [id (in-naturals)])
-      (for/fold ([m* m]) ([v (in-bitset/rev scc)])
+      (for/fold ([m* m]) ([v (in-bitset/reverse scc)])
         (ordered-map-set m* v id))))
 
   ;; Build SCC adjacency (bitset-based)
   (define scc-adj
     (for/fold ([adj (ordered-map-empty integer-compare)])
-              ([v (in-bitset/rev (graph-vertices-set-impl g))])
+              ([v (in-bitset/reverse (graph-vertices-set-impl g))])
       (define src-scc (dict-ref node->scc v 0))
       (for/fold ([adj* adj])
-                ([w (in-bitset/rev (graph-successors-impl g v))])
+                ([w (in-bitset/reverse (graph-successors-impl g v))])
         (define dst-scc (dict-ref node->scc w 0))
         (if (= src-scc dst-scc)
             adj*
