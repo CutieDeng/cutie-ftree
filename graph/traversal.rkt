@@ -26,7 +26,8 @@
 
 ;; Reverse a pvector (using efficient reverse iteration)
 (define (pvector-reverse pv)
-  (for/pvector ([x (in-pvector-reverse pv)])
+  (define rev-seq (in-pvector-reverse pv))
+  (for/pvector ([x rev-seq])
     x)
   ) ; define pvector-reverse
 
@@ -64,9 +65,13 @@
       [else
        (set! visited (bitset-add visited v))
        (define result* (pvector-cons-right result v))
+       (define succs (graph-successors-impl g v))
+       (define succ-seq
+         (in-bitset/reverse succs))
        (for/fold ([r result*])
-                 ([succ (in-bitset/reverse (graph-successors-impl g v))])
-         (visit succ r))]
+                 ([succ succ-seq])
+         (visit succ r))
+       ]
       ) ; cond: visit
     ) ; define visit
 
@@ -87,9 +92,12 @@
       [(bitset-member? visited v) result]
       [else
        (set! visited (bitset-add visited v))
+       (define succs (graph-successors-impl g v))
+       (define succ-seq
+         (in-bitset/reverse succs))
        (define result*
          (for/fold ([r result])
-                   ([succ (in-bitset/reverse (graph-successors-impl g v))])
+                   ([succ succ-seq])
            (visit succ r))
          ) ; define result*
        (pvector-cons-right result* v)]
@@ -116,23 +124,29 @@
 (define (graph-bfs g start)
   (define start-val (vertex-id-val start))
   (define visited (bitset-add bitset-empty start-val))
+  (define result0 (pvector-empty))
+  (define queue0 (pvector-cons-right (pvector-empty) start-val))
 
-  (let loop ([queue (pvector-cons-right (pvector-empty) start-val)]
-             [result (pvector-empty)])
+  (let loop ([queue queue0]
+             [result result0])
     (cond
       [(pvector-empty? queue) result]
       [else
        (define-values (v queue*) (pvector-pop-left queue))
        (define result* (pvector-cons-right result v))
 
+       (define succs (graph-successors-impl g v))
+       (define succ-seq
+         (in-bitset/reverse succs))
        (define-values (new-queue new-visited)
          (for/fold ([q queue*] [vis visited])
-                   ([succ (in-bitset/reverse (graph-successors-impl g v))])
+                   ([succ succ-seq])
            (cond
              [(bitset-member? vis succ) (values q vis)]
              [else
+              (define vis* (bitset-add vis succ))
               (values (pvector-cons-right q succ)
-                      (bitset-add vis succ))]
+                      vis*)]
              ) ; cond: successor seen?
            ) ; for/fold
          ) ; define-values new-queue/new-visited
@@ -156,14 +170,17 @@
   ;; Calculate in-degrees
   (for ([v (in-bitset/reverse vertices)])
     (define preds (graph-predecessors-impl g v))
+    (define pred-count (bitset-count preds))
     (set! in-degree
-          (ordered-map-set in-degree v (bitset-count preds)))
+          (ordered-map-set in-degree v pred-count))
     ) ; for: vertices
 
   ;; Find nodes with zero in-degree
+  (define vertices-seq (in-bitset/reverse vertices))
+  (define q0 (pvector-empty))
   (define initial-queue
-    (for/fold ([q (pvector-empty)])
-              ([v (in-bitset/reverse vertices)])
+    (for/fold ([q q0])
+              ([v vertices-seq])
       (if (= (dict-ref in-degree v 0) 0)
           (pvector-cons-right q v)
           q))
@@ -184,14 +201,18 @@
        (define-values (v queue*) (pvector-pop-left queue))
        (define result* (pvector-cons-right result v))
 
+       (define succs (graph-successors-impl g v))
+       (define succ-seq
+         (in-bitset/reverse succs))
        (define-values (new-queue new-degrees)
          (for/fold ([q queue*] [d degrees])
-                   ([succ (in-bitset/reverse (graph-successors-impl g v))])
+                   ([succ succ-seq])
            (define new-deg (- (dict-ref d succ 0) 1))
            (define d* (ordered-map-set d succ new-deg))
            (if (= new-deg 0)
                (values (pvector-cons-right q succ) d*)
-               (values q d*)))
+               (values q d*))
+           )
          ) ; for/fold
 
        (loop new-queue result* new-degrees)]
@@ -219,9 +240,13 @@
       [else
        (set! visited (ordered-map-set visited node #t))
        (define result* (pvector-cons-right result node))
+       (define succs (get-successors node))
+       (define succ-seq
+         (in-pvector succs))
        (for/fold ([r result*])
-                 ([succ (in-pvector (get-successors node))])
-         (visit succ r))]
+                 ([succ succ-seq])
+         (visit succ r))
+       ]
       ) ; cond: visit
     ) ; define visit
 
@@ -243,9 +268,12 @@
       [(ordered-map-has-key? visited node) result]
       [else
        (set! visited (ordered-map-set visited node #t))
+       (define succs (get-successors node))
+       (define succ-seq
+         (in-pvector succs))
        (define result*
          (for/fold ([r result])
-                   ([succ (in-pvector (get-successors node))])
+                   ([succ succ-seq])
            (visit succ r))
          ) ; define result*
        (pvector-cons-right result* node)]
@@ -276,23 +304,29 @@
 (define (bfs node-compare get-successors start)
   (define visited (ordered-map-empty node-compare))
   (set! visited (ordered-map-set visited start #t))
+  (define result0 (pvector-empty))
+  (define queue0 (pvector-cons-right (pvector-empty) start))
 
-  (let loop ([queue (pvector-cons-right (pvector-empty) start)]
-             [result (pvector-empty)])
+  (let loop ([queue queue0]
+             [result result0])
     (cond
       [(pvector-empty? queue) result]
       [else
        (define-values (node queue*) (pvector-pop-left queue))
        (define result* (pvector-cons-right result node))
 
+       (define succs (get-successors node))
+       (define succ-seq
+         (in-pvector succs))
        (define-values (new-queue new-visited)
          (for/fold ([q queue*] [v visited])
-                   ([succ (in-pvector (get-successors node))])
+                   ([succ succ-seq])
            (cond
              [(ordered-map-has-key? v succ) (values q v)]
              [else
+              (define v* (ordered-map-set v succ #t))
               (values (pvector-cons-right q succ)
-                      (ordered-map-set v succ #t))]
+                      v*)]
              ) ; cond: successor seen?
            ) ; for/fold
          ) ; define-values new-queue/new-visited
@@ -313,18 +347,22 @@
 ;;
 (define (topology-sort node-compare nodes get-successors get-predecessors)
   (define in-degree (ordered-map-empty node-compare))
+  (define node-seq (in-pvector nodes))
 
   ;; Calculate in-degrees
-  (for ([node (in-pvector nodes)])
+  (for ([node node-seq])
+    (define preds (get-predecessors node))
     (set! in-degree
           (ordered-map-set in-degree node
-                           (pvector-length (get-predecessors node))))
+                           (pvector-length preds))
+          )
     ) ; for: nodes
 
   ;; Find nodes with zero in-degree
+  (define q0 (pvector-empty))
   (define initial-queue
-    (for/fold ([q (pvector-empty)])
-              ([node (in-pvector nodes)])
+    (for/fold ([q q0])
+              ([node node-seq])
       (if (= (dict-ref in-degree node 0) 0)
           (pvector-cons-right q node)
           q))
@@ -343,14 +381,18 @@
        (define-values (node queue*) (pvector-pop-left queue))
        (define result* (pvector-cons-right result node))
 
+       (define succs (get-successors node))
+       (define succ-seq
+         (in-pvector succs))
        (define-values (new-queue new-degrees)
          (for/fold ([q queue*] [d degrees])
-                   ([succ (in-pvector (get-successors node))])
+                   ([succ succ-seq])
            (define new-deg (- (dict-ref d succ 0) 1))
            (define d* (ordered-map-set d succ new-deg))
            (if (= new-deg 0)
                (values (pvector-cons-right q succ) d*)
-               (values q d*)))
+               (values q d*))
+           )
          ) ; for/fold
 
        (loop new-queue result* new-degrees)]

@@ -70,21 +70,29 @@
 
     ;; Visit successors - graph-successors-impl returns bitset of vertex vals
     ;; Use in-bitset/reverse for ~5x better iteration performance
-    (for ([w (in-bitset/reverse (graph-successors-impl g v))])
+    (define succs (graph-successors-impl g v))
+    (define succs-seq (in-bitset/reverse succs))
+    (for ([w succs-seq])
       (cond
         [(not (ordered-map-has-key? index w))
          ;; w not yet visited
          (strongconnect w)
-         (set! lowlink
-               (ordered-map-set lowlink v
-                 (min (dict-ref lowlink v 0)
-                      (dict-ref lowlink w 0))))]
+         (define v-low (dict-ref lowlink v 0))
+         (define w-low (dict-ref lowlink w 0))
+         (define new-low (min v-low w-low))
+         (define lowlink^ (ordered-map-set lowlink v new-low))
+         (set! lowlink lowlink^)
+         ] ; cond branch: unvisited
         [(bitset-member? on-stack w)
          ;; w is on stack, part of current SCC
-         (set! lowlink
-               (ordered-map-set lowlink v
-                 (min (dict-ref lowlink v 0)
-                      (dict-ref index w 0))))]))
+         (define v-low (dict-ref lowlink v 0))
+         (define w-index (dict-ref index w 0))
+         (define new-low (min v-low w-index))
+         (define lowlink^ (ordered-map-set lowlink v new-low))
+         (set! lowlink lowlink^)
+         ] ; cond branch: on-stack
+        ) ; cond
+      ) ; for succs
 
     ;; If v is root of an SCC, pop the SCC from stack
     (when (= (dict-ref lowlink v 0) (dict-ref index v 0))
@@ -95,14 +103,21 @@
           (define new-component (bitset-add component top))
           (if (= top v)
               (values new-component stk*)
-              (loop new-component stk*))))
+              (loop new-component stk*))
+          ) ; let loop body
+        ) ; let loop
       (set! stack new-stack)
-      (set! sccs (pvector-cons-right sccs scc))))
+      (define sccs^ (pvector-cons-right sccs scc))
+      (set! sccs sccs^)
+      ) ; when root-scc
+    ) ; define strongconnect
 
   ;; Visit all vertices (use in-bitset/reverse for ~5x better performance)
-  (for ([v (in-bitset/reverse vertices)])
+  (define vertices-seq (in-bitset/reverse vertices))
+  (for ([v vertices-seq])
     (unless (ordered-map-has-key? index v)
-      (strongconnect v)))
+      (strongconnect v)
+      ))
 
   sccs)
 
@@ -120,25 +135,42 @@
   (define num-sccs (pvector-length sccs))
 
   ;; Build vertex -> SCC ID mapping
+  (define sccs-seq (in-pvector sccs))
+  (define id-seq (in-naturals))
+  (define node->scc0 (ordered-map-empty integer-compare))
   (define node->scc
-    (for/fold ([m (ordered-map-empty integer-compare)])
-              ([scc (in-pvector sccs)]
-               [id (in-naturals)])
-      (for/fold ([m* m]) ([v (in-bitset/reverse scc)])
-        (ordered-map-set m* v id))))
+    (for/fold ([m node->scc0])
+              ([scc sccs-seq]
+               [id id-seq])
+      (define scc-seq (in-bitset/reverse scc))
+      (for/fold ([m* m]) ([v scc-seq])
+        (ordered-map-set m* v id)
+        ) ; inner for/fold
+      )) ; outer for/fold
 
   ;; Build SCC adjacency (bitset-based)
+  (define vertices (graph-vertices-set-impl g))
+  (define vertices-seq (in-bitset/reverse vertices))
+  (define scc-adj0 (ordered-map-empty integer-compare))
+  (define empty-scc-neighbors bitset-empty)
   (define scc-adj
-    (for/fold ([adj (ordered-map-empty integer-compare)])
-              ([v (in-bitset/reverse (graph-vertices-set-impl g))])
+    (for/fold ([adj scc-adj0])
+              ([v vertices-seq])
       (define src-scc (dict-ref node->scc v 0))
+      (define succs (graph-successors-impl g v))
+      (define succs-seq (in-bitset/reverse succs))
       (for/fold ([adj* adj])
-                ([w (in-bitset/reverse (graph-successors-impl g v))])
+                ([w succs-seq])
         (define dst-scc (dict-ref node->scc w 0))
         (if (= src-scc dst-scc)
             adj*
-            (let ([existing (dict-ref adj* src-scc bitset-empty)])
-              (ordered-map-set adj* src-scc (bitset-add existing dst-scc)))))))
+            (let ()
+              (define existing (dict-ref adj* src-scc empty-scc-neighbors))
+              (define updated (bitset-add existing dst-scc))
+              (ordered-map-set adj* src-scc updated))
+            ) ; if same-scc
+        ) ; inner for/fold
+      )) ; outer for/fold
 
   ;; SCC successors function
   (define (scc-successors scc-id)
@@ -176,21 +208,28 @@
     (set! on-stack (ordered-map-set on-stack node #t))
 
     ;; Visit successors
-    (for ([succ (in-pvector (get-successors node))])
+    (define succs (get-successors node))
+    (for ([succ (in-pvector succs)])
       (cond
         [(not (ordered-map-has-key? index succ))
          ;; Not visited
          (strongconnect succ)
-         (set! lowlink
-               (ordered-map-set lowlink node
-                 (min (dict-ref lowlink node 0)
-                      (dict-ref lowlink succ 0))))]
+         (define node-low (dict-ref lowlink node 0))
+         (define succ-low (dict-ref lowlink succ 0))
+         (define new-low (min node-low succ-low))
+         (define lowlink^ (ordered-map-set lowlink node new-low))
+         (set! lowlink lowlink^)
+         ] ; cond branch: unvisited
         [(ordered-map-has-key? on-stack succ)
          ;; On stack, part of current SCC
-         (set! lowlink
-               (ordered-map-set lowlink node
-                 (min (dict-ref lowlink node 0)
-                      (dict-ref index succ 0))))]))
+         (define node-low (dict-ref lowlink node 0))
+         (define succ-index (dict-ref index succ 0))
+         (define new-low (min node-low succ-index))
+         (define lowlink^ (ordered-map-set lowlink node new-low))
+         (set! lowlink lowlink^)
+         ] ; cond branch: on-stack
+        ) ; cond
+      ) ; for succs
 
     ;; If root of SCC, pop and record
     (when (= (dict-ref lowlink node 0)
@@ -202,13 +241,19 @@
           (define new-component (pvector-cons-left component top))
           (if (equal? top node)
               (values new-component stk*)
-              (loop new-component stk*))))
+              (loop new-component stk*))
+          ) ; let loop body
+        ) ; let loop
       (set! stack new-stack)
-      (set! sccs (pvector-cons-right sccs scc))))
+      (define sccs^ (pvector-cons-right sccs scc))
+      (set! sccs sccs^)
+      ) ; when root-scc
+    ) ; define strongconnect
 
   (for ([node (in-pvector nodes)])
     (unless (ordered-map-has-key? index node)
-      (strongconnect node)))
+      (strongconnect node)
+      ))
 
   sccs)
 
@@ -228,9 +273,12 @@
   (define (dfs1 node)
     (unless (ordered-map-has-key? visited node)
       (set! visited (ordered-map-set visited node #t))
-      (for ([succ (in-pvector (get-successors node))])
+      (define succs (get-successors node))
+      (for ([succ (in-pvector succs)])
         (dfs1 succ))
-      (set! finish-order (pvector-cons-right finish-order node))))
+      (define finish-order^ (pvector-cons-right finish-order node))
+      (set! finish-order finish-order^)
+      ))
 
   (for ([node (in-pvector nodes)])
     (dfs1 node))
@@ -245,16 +293,24 @@
       [else
        (set! visited (ordered-map-set visited node #t))
        (define new-component (pvector-cons-right component node))
+       (define preds (get-predecessors node))
+       (define preds-seq (in-pvector preds))
        (for/fold ([comp new-component])
-                 ([pred (in-pvector (get-predecessors node))])
-         (dfs2 pred comp))]))
+                 ([pred preds-seq])
+         (dfs2 pred comp)
+         ) ; for/fold preds
+       ] ; cond else
+      )) ; cond
 
   ;; Process in reverse finish order
   (define reversed-finish (pvector-reverse finish-order))
   (for ([node (in-pvector reversed-finish)])
     (unless (ordered-map-has-key? visited node)
-      (define component (dfs2 node (pvector-empty)))
-      (set! sccs (pvector-cons-right sccs component))))
+      (define empty-component (pvector-empty))
+      (define component (dfs2 node empty-component))
+      (define sccs^ (pvector-cons-right sccs component))
+      (set! sccs sccs^)
+      ))
 
   sccs)
 
@@ -273,32 +329,49 @@
   (define num-sccs (pvector-length sccs))
 
   ;; Build node -> SCC id mapping
+  (define sccs-seq (in-pvector sccs))
+  (define id-seq (in-naturals))
+  (define node->scc-id0 (ordered-map-empty node-compare))
   (define node->scc-id
-    (for/fold ([m (ordered-map-empty node-compare)])
-              ([scc (in-pvector sccs)]
-               [id (in-naturals)])
+    (for/fold ([m node->scc-id0])
+              ([scc sccs-seq]
+               [id id-seq])
+      (define nodes-seq (in-pvector scc))
       (for/fold ([m* m])
-                ([node (in-pvector scc)])
-        (ordered-map-set m* node id))))
+                ([node nodes-seq])
+        (ordered-map-set m* node id)
+        ) ; inner for/fold
+      )) ; outer for/fold
 
   ;; Build SCC adjacency using ordered-map of ordered-map (as set)
+  (define nodes-seq (in-pvector nodes))
+  (define scc-adj0 (ordered-map-empty integer-compare))
+  (define empty-neighbor-map (ordered-map-empty integer-compare))
   (define scc-adj
-    (for/fold ([adj (ordered-map-empty integer-compare)])
-              ([node (in-pvector nodes)])
+    (for/fold ([adj scc-adj0])
+              ([node nodes-seq])
       (define src-scc (dict-ref node->scc-id node 0))
+      (define succs (get-successors node))
+      (define succs-seq (in-pvector succs))
       (for/fold ([adj* adj])
-                ([succ (in-pvector (get-successors node))])
+                ([succ succs-seq])
         (define dst-scc (dict-ref node->scc-id succ 0))
         (if (= src-scc dst-scc)
             adj*
-            (let* ([existing (dict-ref adj* src-scc (ordered-map-empty integer-compare))]
-                   [updated (ordered-map-set existing dst-scc #t)])
-              (ordered-map-set adj* src-scc updated))))))
+            (let ()
+              (define existing (dict-ref adj* src-scc empty-neighbor-map))
+              (define updated (ordered-map-set existing dst-scc #t))
+              (ordered-map-set adj* src-scc updated))
+            ) ; if same-scc
+        ) ; inner for/fold
+      )) ; outer for/fold
 
   ;; SCC successors function
   (define (scc-successors scc-id)
-    (define adj-map (dict-ref scc-adj scc-id (ordered-map-empty integer-compare)))
-    (list->pvector (ordered-map-keys adj-map)))
+    (define empty-adj (ordered-map-empty integer-compare))
+    (define adj-map (dict-ref scc-adj scc-id empty-adj))
+    (define keys (ordered-map-keys adj-map))
+    (list->pvector keys))
 
   (values node->scc-id sccs scc-successors))
 
@@ -308,14 +381,19 @@
 
 ;; Reverse a pvector (using efficient reverse iteration)
 (define (pvector-reverse pv)
-  (for/pvector ([x (in-pvector-reverse pv)])
+  (define rev-seq (in-pvector-reverse pv))
+  (for/pvector ([x rev-seq])
     x))
 
 ;; Helper: delete without error if key doesn't exist
 (define (ordered-map-delete* om key)
-  (if (ordered-map-has-key? om key)
-      (let-values ([(m _) (ordered-map-delete om key)]) m)
-      om))
+  (cond
+    [(ordered-map-has-key? om key)
+     (define-values (m _removed) (ordered-map-delete om key))
+     m]
+    [else om]
+    ) ; cond
+  ) ; define ordered-map-delete*
 
 ;; Get SCC id for a node
 ;; Parameters:

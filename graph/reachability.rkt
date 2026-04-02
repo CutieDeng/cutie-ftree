@@ -49,8 +49,12 @@
   (define (visit v)
     (unless (bitset-member? visited v)
       (set! visited (bitset-add visited v))
-      (for ([succ (in-bitset/reverse (graph-successors-impl g v))])
-        (visit succ)))
+      (define succs (graph-successors-impl g v))
+      (define succ-seq (in-bitset/reverse succs))
+      (for ([succ succ-seq])
+        (visit succ)
+        )
+      ) ; unless: unseen vertex
     ) ; define visit
 
   (visit start-val)
@@ -68,8 +72,12 @@
   (define (visit v)
     (unless (bitset-member? visited v)
       (set! visited (bitset-add visited v))
-      (for ([succ (in-bitset/reverse (graph-successors-impl g v))])
-        (visit succ)))
+      (define succs (graph-successors-impl g v))
+      (define succ-seq (in-bitset/reverse succs))
+      (for ([succ succ-seq])
+        (visit succ)
+        )
+      ) ; unless: unseen vertex
     ) ; define visit
 
   (for ([start (in-bitset/reverse starts)])
@@ -96,8 +104,13 @@
       [else
        (set! visited (bitset-add visited v))
        (define path* (pvector-cons-right path v))
-       (for/or ([succ (in-bitset/reverse (graph-successors-impl g v))])
-         (search succ path*))]))
+       (define succs (graph-successors-impl g v))
+       (define succ-seq (in-bitset/reverse succs))
+       (for/or ([succ succ-seq])
+         (search succ path*))
+       ]
+      ) ; cond: search
+    ) ; define search
 
   (search start-val (pvector-empty))
   ) ; define graph-find-path
@@ -114,14 +127,23 @@
   (define (search v path visited)
     (cond
       [(= v end-val)
-       (pvector-cons-right (pvector-empty) (pvector-cons-right path v))]
+       (define one-path (pvector-cons-right path v))
+       (pvector-cons-right (pvector-empty) one-path)
+       ]
       [(bitset-member? visited v) (pvector-empty)]
       [else
        (define new-visited (bitset-add visited v))
        (define path* (pvector-cons-right path v))
-       (for/fold ([paths (pvector-empty)])
-                 ([succ (in-bitset/reverse (graph-successors-impl g v))])
-         (pvector-append paths (search succ path* new-visited)))]))
+       (define succs (graph-successors-impl g v))
+       (define succ-seq (in-bitset/reverse succs))
+       (define paths0 (pvector-empty))
+       (for/fold ([paths paths0])
+                 ([succ succ-seq])
+         (define found (search succ path* new-visited))
+         (pvector-append paths found))
+       ]
+      ) ; cond: search
+    ) ; define search
 
   (search start-val (pvector-empty) bitset-empty)
   ) ; define graph-all-paths
@@ -146,9 +168,14 @@
       [else
        (set! visited (ordered-map-set visited node #t))
        (define result* (pvector-cons-right result node))
+       (define succs (get-successors node))
+       (define succ-seq (in-pvector succs))
        (for/fold ([r result*])
-                 ([succ (in-pvector (get-successors node))])
-         (visit succ r))]))
+                 ([succ succ-seq])
+         (visit succ r))
+       ]
+      ) ; cond: visit
+    ) ; define visit
 
   (visit start (pvector-empty))
   ) ; define reachable-from
@@ -166,8 +193,12 @@
   (define (visit node)
     (unless (ordered-map-has-key? visited node)
       (set! visited (ordered-map-set visited node #t))
-      (for ([succ (in-pvector (get-successors node))])
-        (visit succ)))
+      (define succs (get-successors node))
+      (define succ-seq (in-pvector succs))
+      (for ([succ succ-seq])
+        (visit succ)
+        )
+      ) ; unless: unseen node
     ) ; define visit
 
   (for ([start (in-pvector starts)])
@@ -195,8 +226,13 @@
       [else
        (set! visited (ordered-map-set visited node #t))
        (define path* (pvector-cons-right path node))
-       (for/or ([succ (in-pvector (get-successors node))])
-         (search succ path*))]))
+       (define succs (get-successors node))
+       (define succ-seq (in-pvector succs))
+       (for/or ([succ succ-seq])
+         (search succ path*))
+       ]
+      ) ; cond: search
+    ) ; define search
 
   (search start (pvector-empty))
   ) ; define find-path
@@ -213,14 +249,23 @@
   (define (search node path visited)
     (cond
       [(equal? node end)
-       (pvector-cons-right (pvector-empty) (pvector-cons-right path node))]
+       (define one-path (pvector-cons-right path node))
+       (pvector-cons-right (pvector-empty) one-path)
+       ]
       [(ordered-map-has-key? visited node) (pvector-empty)]
       [else
        (define new-visited (ordered-map-set visited node #t))
        (define path* (pvector-cons-right path node))
-       (for/fold ([paths (pvector-empty)])
-                 ([succ (in-pvector (get-successors node))])
-         (pvector-append paths (search succ path* new-visited)))]))
+       (define succs (get-successors node))
+       (define succ-seq (in-pvector succs))
+       (define paths0 (pvector-empty))
+       (for/fold ([paths paths0])
+                 ([succ succ-seq])
+         (define found (search succ path* new-visited))
+         (pvector-append paths found))
+       ]
+      ) ; cond: search
+    ) ; define search
 
   (search start (pvector-empty) (ordered-map-empty node-compare))
   ) ; define all-paths

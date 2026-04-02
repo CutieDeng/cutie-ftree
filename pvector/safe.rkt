@@ -23,7 +23,8 @@
     (lambda (v)
       (and (pvector? v)
            (for/and ([e (in-pvector v)])
-             ((contract-first-order elem-ctc) e)))
+             ((contract-first-order elem-ctc) e))
+           )
       ) ; lambda: first-order
     #:late-neg-projection
     (lambda (blame)
@@ -57,10 +58,14 @@
   #:property prop:sequence
   (lambda (cpv)
     (in-generator
-      (for ([e (in-pvector (contracted-pvector-pv cpv))])
+      (for ([e (in-pvector
+                (contracted-pvector-pv cpv)
+                )
+               ])
         (yield ((contracted-pvector-elem-proj-out cpv)
                 e
-                (contracted-pvector-neg-party cpv)))
+                (contracted-pvector-neg-party cpv))
+               )
         ) ; for: contracted pvector elements
       ) ; in-generator
     ) ; lambda: sequence
@@ -68,7 +73,9 @@
   [(define (write-proc cpv port mode)
      (fprintf port
               "#<contracted-pvector:~a>"
-              (pvector-length (contracted-pvector-pv cpv)))
+              (pvector-length
+               (contracted-pvector-pv cpv))
+              )
      ) ; fprintf
    ]) ; methods: gen:custom-write
 
@@ -90,14 +97,18 @@
 ;; Helper: check element on input
 (define (check-elem-in cpv elem)
   (if (contracted-pvector? cpv)
-      ((contracted-pvector-elem-proj-in cpv) elem (contracted-pvector-neg-party cpv))
+      ((contracted-pvector-elem-proj-in cpv)
+       elem
+       (contracted-pvector-neg-party cpv))
       elem)
   ) ; define check-elem-in
 
 ;; Helper: check element on output
 (define (check-elem-out cpv elem)
   (if (contracted-pvector? cpv)
-      ((contracted-pvector-elem-proj-out cpv) elem (contracted-pvector-neg-party cpv))
+      ((contracted-pvector-elem-proj-out cpv)
+       elem
+       (contracted-pvector-neg-party cpv))
       elem)
   ) ; define check-elem-out
 
@@ -108,42 +119,62 @@
 
 (define (cpv-set pv idx val)
   (rewrap-pv pv
-             (pvector-set (unwrap-pv pv) idx (check-elem-in pv val)))
+             (pvector-set (unwrap-pv pv)
+                          idx
+                          (check-elem-in pv val))
+             )
   ) ; define cpv-set
 
 (define (cpv-cons-left pv val)
   (rewrap-pv pv
-             (pvector-cons-left (unwrap-pv pv) (check-elem-in pv val)))
+             (pvector-cons-left (unwrap-pv pv)
+                                (check-elem-in pv val))
+             )
   ) ; define cpv-cons-left
 
 (define (cpv-cons-right pv val)
   (rewrap-pv pv
-             (pvector-cons-right (unwrap-pv pv) (check-elem-in pv val)))
+             (pvector-cons-right (unwrap-pv pv)
+                                 (check-elem-in pv val))
+             )
   ) ; define cpv-cons-right
 
 (define (cpv-pop-left pv)
-  (define-values (elem rest) (pvector-pop-left (unwrap-pv pv)))
+  (define-values (elem rest)
+    (pvector-pop-left
+     (unwrap-pv pv)
+     ))
   (values (check-elem-out pv elem) (rewrap-pv pv rest))
   ) ; define cpv-pop-left
 
 (define (cpv-pop-right pv)
-  (define-values (elem rest) (pvector-pop-right (unwrap-pv pv)))
+  (define-values (elem rest)
+    (pvector-pop-right
+     (unwrap-pv pv)
+     ))
   (values (check-elem-out pv elem) (rewrap-pv pv rest))
   ) ; define cpv-pop-right
 
 (define (cpv-view-left pv)
   (check-elem-out pv
-                  (pvector-view-left (unwrap-pv pv)))
+                  (pvector-view-left
+                   (unwrap-pv pv)
+                   ))
   ) ; define cpv-view-left
 
 (define (cpv-view-right pv)
   (check-elem-out pv
-                  (pvector-view-right (unwrap-pv pv)))
+                  (pvector-view-right
+                   (unwrap-pv pv)
+                   ))
   ) ; define cpv-view-right
 
 (define (cpv-insert pv idx val)
   (rewrap-pv pv
-             (pvector-insert (unwrap-pv pv) idx (check-elem-in pv val)))
+             (pvector-insert (unwrap-pv pv)
+                             idx
+                             (check-elem-in pv val))
+             )
   ) ; define cpv-insert
 
 (define (cpv-delete pv idx)
@@ -169,7 +200,10 @@
 
 (define (cpv-append pv1 pv2)
   ;; Use pv1's contract if it has one, otherwise pv2's
-  (define result (pvector-append (unwrap-pv pv1) (unwrap-pv pv2)))
+  (define result
+    (pvector-append (unwrap-pv pv1)
+                    (unwrap-pv pv2)
+                    ))
   (cond
     [(contracted-pvector? pv1) (rewrap-pv pv1 result)]
     [(contracted-pvector? pv2) (rewrap-pv pv2 result)]
@@ -202,16 +236,21 @@
     (->i ([pv pvector/c]
           [idx (pv)
                (and/c index/c
-                      (</c (pvector-length pv)))])
-         [result any/c])]
+                      (</c (pvector-length pv))
+                      )]
+         )
+         [result any/c]
+         )]
 
   [pvector-set
     (->i ([pv pvector/c]
           [idx (pv)
                (and/c index/c
-                      (</c (pvector-length pv)))]
+                      (</c (pvector-length pv))
+                      )]
           [val any/c])
-         [result pvector/c])]
+         [result pvector/c]
+         )]
 
   ;; Add/remove from ends
   [pvector-cons-left (-> pvector/c any/c pvector/c)]
@@ -219,11 +258,13 @@
 
   [pvector-pop-left
     (-> (and/c pvector/c (not/c pvector-empty?))
-        (values any/c pvector/c))]
+        (values any/c pvector/c)
+        )]
 
   [pvector-pop-right
     (-> (and/c pvector/c (not/c pvector-empty?))
-        (values any/c pvector/c))]
+        (values any/c pvector/c)
+        )]
 
   ;; View ends (non-destructive)
   [pvector-view-left
@@ -240,87 +281,121 @@
     (->i ([pv (and/c pvector/c (not/c pvector-empty?))]
           [idx (pv)
                (and/c index/c
-                      (</c (pvector-length pv)))])
+                      (</c (pvector-length pv))
+                      )]
+         )
          (values
-          [left pvector/c]
-          [mid any/c]
-          [right pvector/c]))]
+         [left pvector/c]
+         [mid any/c]
+          [right pvector/c]
+          )
+         )]
 
   [pvector-split-at
     (->i ([pv pvector/c]
           [pos (pv)
                (and/c index/c
-                      (<=/c (pvector-length pv)))])
+                      (<=/c (pvector-length pv))
+                      )]
+         )
          (values
           [left pvector/c]
-          [right pvector/c]))]
+          [right pvector/c]
+          )
+         )]
 
   [pvector-split-at-right
     (->i ([pv pvector/c]
           [pos (pv)
                (and/c index/c
-                      (<=/c (pvector-length pv)))])
+                      (<=/c (pvector-length pv))
+                      )]
+         )
          (values
           [right pvector/c]
-          [left pvector/c]))]
+          [left pvector/c]
+          )
+         )]
 
   ;; Slice operations
   [pvector-take
     (->i ([pv pvector/c]
           [n (pv)
              (and/c index/c
-                    (<=/c (pvector-length pv)))])
-         [result pvector/c])]
+                    (<=/c (pvector-length pv))
+                    )]
+         )
+         [result pvector/c]
+         )]
 
   [pvector-drop
     (->i ([pv pvector/c]
           [n (pv)
              (and/c index/c
-                    (<=/c (pvector-length pv)))])
-         [result pvector/c])]
+                    (<=/c (pvector-length pv))
+                    )]
+         )
+         [result pvector/c]
+         )]
 
   [pvector-take-right
     (->i ([pv pvector/c]
           [n (pv)
              (and/c index/c
-                    (<=/c (pvector-length pv)))])
-         [result pvector/c])]
+                    (<=/c (pvector-length pv))
+                    )]
+         )
+         [result pvector/c]
+         )]
 
   [pvector-drop-right
     (->i ([pv pvector/c]
           [n (pv)
              (and/c index/c
-                    (<=/c (pvector-length pv)))])
-         [result pvector/c])]
+                    (<=/c (pvector-length pv))
+                    )]
+         )
+         [result pvector/c]
+         )]
 
   [pvector-copy
     (->i ([pv pvector/c]
           [start (pv)
                  (and/c index/c
-                        (<=/c (pvector-length pv)))]
+                        (<=/c (pvector-length pv))
+                        )]
           [end (pv start)
                (and/c index/c
                       (<=/c (pvector-length pv))
-                      (>=/c start))])
-         [result pvector/c])]
+                      (>=/c start)
+                      )]
+         )
+         [result pvector/c]
+         )]
 
   ;; Insert and delete
   [pvector-insert
     (->i ([pv pvector/c]
           [idx (pv)
                (and/c index/c
-                      (<=/c (pvector-length pv)))]
+                      (<=/c (pvector-length pv))
+                      )]
           [val any/c])
-         [result pvector/c])]
+         [result pvector/c]
+         )]
 
   [pvector-delete
     (->i ([pv (and/c pvector/c (not/c pvector-empty?))]
           [idx (pv)
                (and/c index/c
-                      (</c (pvector-length pv)))])
+                      (</c (pvector-length pv))
+                      )]
+         )
          (values
           [result pvector/c]
-          [deleted any/c]))]
+          [deleted any/c]
+          )
+         )]
 
   ;; Conversion
   [vector->pvector (-> vector? pvector/c)]

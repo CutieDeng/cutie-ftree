@@ -12,7 +12,9 @@
   (flat-named-contract 'ordered-map ordered-map?))
 
 (define query-mode/c
-  (flat-named-contract 'query-mode (or/c '< '<= '> '>=)))
+  (flat-named-contract 'query-mode
+                       (or/c '< '<= '> '>=))
+  ) ; define query-mode/c
 
 ;; ordered-mapof: like hash/c, checks all keys and values satisfy contracts
 ;; Returns a wrapped ordered-map that enforces contracts on all operations
@@ -26,7 +28,9 @@
       (and (ordered-map? v)
            (for/and ([kv (in-ordered-map v)])
              (and ((contract-first-order key-ctc) (car kv))
-                  ((contract-first-order val-ctc) (cdr kv)))))
+                  ((contract-first-order val-ctc) (cdr kv))
+                  ))
+           )
       ) ; lambda: first-order
     #:late-neg-projection
     (lambda (blame)
@@ -74,22 +78,28 @@
   #:property prop:sequence
   (lambda (com)
     (in-generator
-      (for ([kv (in-ordered-map (contracted-ordered-map-om com))])
+      (for ([kv (in-ordered-map
+                 (contracted-ordered-map-om com)
+                 )
+                ])
         (yield
          (cons ((contracted-ordered-map-key-proj-out com)
                 (car kv)
                 (contracted-ordered-map-neg-party com))
                ((contracted-ordered-map-val-proj-out com)
                 (cdr kv)
-                (contracted-ordered-map-neg-party com))))
+                (contracted-ordered-map-neg-party com))
+               ))
         ) ; for: contracted ordered-map entries
       ) ; in-generator
     ) ; lambda: sequence
   #:methods gen:custom-write
-  [(define (write-proc com port mode)
+   [(define (write-proc com port mode)
      (fprintf port
               "#<contracted-ordered-map:~a>"
-              (ordered-map-count (contracted-ordered-map-om com)))
+              (ordered-map-count
+               (contracted-ordered-map-om com))
+              )
      ) ; fprintf
    ]) ; methods: gen:custom-write
 
@@ -113,14 +123,18 @@
 ;; Helper: check key on input
 (define (check-key-in com key)
   (if (contracted-ordered-map? com)
-      ((contracted-ordered-map-key-proj-in com) key (contracted-ordered-map-neg-party com))
+      ((contracted-ordered-map-key-proj-in com)
+       key
+       (contracted-ordered-map-neg-party com))
       key)
   ) ; define check-key-in
 
 ;; Helper: check value on input
 (define (check-val-in com val)
   (if (contracted-ordered-map? com)
-      ((contracted-ordered-map-val-proj-in com) val (contracted-ordered-map-neg-party com))
+      ((contracted-ordered-map-val-proj-in com)
+       val
+       (contracted-ordered-map-neg-party com))
       val)
   ) ; define check-val-in
 
@@ -132,12 +146,17 @@
              (contracted-ordered-map-neg-party com))
             ((contracted-ordered-map-val-proj-out com)
              (cdr kv)
-             (contracted-ordered-map-neg-party com)))
+             (contracted-ordered-map-neg-party com))
+            )
       kv)
   ) ; define check-kv-out
 
 ;; Contracted ordered-map operations
-(define (com-ref om key [default (lambda () (error "key not found" key))])
+(define (com-ref om key
+                 [default
+                  (lambda ()
+                    (error "key not found" key))
+                  ])
   (define result (ordered-map-ref (unwrap-om om) (check-key-in om key) default))
   (if (contracted-ordered-map? om)
       ((contracted-ordered-map-val-proj-out om)
@@ -147,33 +166,55 @@
   ) ; define com-ref
 
 (define (com-set om key val)
-  (rewrap-om om (ordered-map-set (unwrap-om om) (check-key-in om key) (check-val-in om val)))
+  (rewrap-om om
+             (ordered-map-set (unwrap-om om)
+                              (check-key-in om key)
+                              (check-val-in om val))
+             )
   ) ; define com-set
 
 (define (com-insert om key val replace?)
-  (rewrap-om om (ordered-map-insert (unwrap-om om) (check-key-in om key) (check-val-in om val) replace?))
+  (rewrap-om om
+             (ordered-map-insert (unwrap-om om)
+                                 (check-key-in om key)
+                                 (check-val-in om val)
+                                 replace?))
   ) ; define com-insert
 
 (define (com-delete om key)
   (define-values (result deleted)
-    (ordered-map-delete (unwrap-om om) (check-key-in om key)))
+    (ordered-map-delete (unwrap-om om)
+                        (check-key-in om key)
+                        ))
   (values (rewrap-om om result) (check-kv-out om deleted))
   ) ; define com-delete
 
 (define (com-query om key)
-  (check-kv-out om (ordered-map-query (unwrap-om om) (check-key-in om key)))
+  (check-kv-out om
+                (ordered-map-query (unwrap-om om)
+                                   (check-key-in om key)
+                                   ))
   ) ; define com-query
 
 (define (com-query-weak om key mode)
-  (check-kv-out om (ordered-map-query-weak (unwrap-om om) (check-key-in om key) mode))
+  (check-kv-out om
+                (ordered-map-query-weak (unwrap-om om)
+                                        (check-key-in om key)
+                                        mode))
   ) ; define com-query-weak
 
 (define (com-min om)
-  (check-kv-out om (ordered-map-min (unwrap-om om)))
+  (check-kv-out om
+                (ordered-map-min
+                 (unwrap-om om)
+                 ))
   ) ; define com-min
 
 (define (com-max om)
-  (check-kv-out om (ordered-map-max (unwrap-om om)))
+  (check-kv-out om
+                (ordered-map-max
+                 (unwrap-om om)
+                 ))
   ) ; define com-max
 
 (define (com-count om)
@@ -222,17 +263,27 @@
   [ordered-map-count (-> ordered-map/c exact-nonnegative-integer?)]
 
   ;; Min/Max access
-  [ordered-map-min (-> ordered-map/c (or/c #f pair?))]
-  [ordered-map-max (-> ordered-map/c (or/c #f pair?))]
+  [ordered-map-min
+   (-> ordered-map/c
+       (or/c #f pair?)
+       )]
+  [ordered-map-max
+   (-> ordered-map/c
+       (or/c #f pair?)
+       )]
 
   ;; Query
-  [ordered-map-query (-> ordered-map/c any/c (or/c #f pair?))]
+  [ordered-map-query
+   (-> ordered-map/c any/c
+       (or/c #f pair?)
+       )]
 
   [ordered-map-query-weak
     (-> ordered-map/c
         any/c
         query-mode/c
-        (or/c #f pair?))]
+        (or/c #f pair?)
+        )]
 
   [ordered-map-has-key? (-> ordered-map/c any/c boolean?)]
 
@@ -249,11 +300,19 @@
 
   [ordered-map-delete
     (-> ordered-map/c any/c
-        (values ordered-map/c (or/c #f pair?)))]
+        (values ordered-map/c
+                (or/c #f pair?))
+        )]
 
   ;; Collection operations
-  [ordered-map-keys (-> ordered-map/c (listof any/c))]
-  [ordered-map-values (-> ordered-map/c (listof any/c))]
+  [ordered-map-keys
+   (-> ordered-map/c
+       (listof any/c)
+       )]
+  [ordered-map-values
+   (-> ordered-map/c
+       (listof any/c)
+       )]
 
   ;; Sequence (generator-based)
   [in-ordered-map (-> ordered-map/c sequence?)]
@@ -265,8 +324,14 @@
   [in-ordered-map/lazy (-> ordered-map/c sequence?)]
 
   ;; Ordinal query operations
-  [ordered-map-rank (-> ordered-map/c any/c (or/c #f exact-nonnegative-integer?))]
-  [ordered-map-select (-> ordered-map/c exact-integer? (or/c #f pair?))]
+  [ordered-map-rank
+   (-> ordered-map/c any/c
+       (or/c #f exact-nonnegative-integer?)
+       )]
+  [ordered-map-select
+   (-> ordered-map/c exact-integer?
+       (or/c #f pair?)
+       )]
   [ordered-map-count-less-than (-> ordered-map/c any/c exact-nonnegative-integer?)]
   ) ; provide/contract
 

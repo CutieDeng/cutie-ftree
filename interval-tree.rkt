@@ -27,15 +27,24 @@
     (lambda () interval-empty-measure)
     ;; measure of single interval
     (lambda (interval)
-      (cons (car interval) (cadr interval)))  ; (lo . hi)
+      (cons (car interval) (cadr interval))
+      ) ; lambda: single interval measure
     ;; combine measures
     (lambda (m1 m2)
-      (if (eq? m1 interval-empty-measure)
-          m2
-          (if (eq? m2 interval-empty-measure)
-              m1
-              (cons (min (car m1) (car m2))
-                    (max (cdr m1) (cdr m2))))))))
+      (cond
+        [(eq? m1 interval-empty-measure) m2]
+        [(eq? m2 interval-empty-measure) m1]
+        [else
+         (cons (min (car m1) (car m2))
+               (max (cdr m1)
+                    (cdr m2)
+                    )
+               )
+         ] ; cond-branch: merge interval measures
+      ) ; lambda: combine measures
+    ) ; ft:config args
+  ) ; ft:config
+  ) ; define interval-config
 
 ;; ========================================
 ;; Basic Operations
@@ -45,7 +54,8 @@
   (interval-tree (ft:empty) 0))
 
 (define (interval-tree-empty? it)
-  (ft:empty? (interval-tree-ft it)))
+  (define ft (interval-tree-ft it))
+  (ft:empty? ft))
 
 (define (it-count it)
   (interval-tree-count it))
@@ -59,25 +69,30 @@
   (define interval (list lo hi value))
   (cond
     [(ft:empty? ft)
-     (interval-tree (ft:single interval) (add1 cnt))]
+     (interval-tree (ft:single interval) (add1 cnt))
+     ]
     [else
      (define measure (ft-measure ft))
      ;; Fast path: if all intervals have lo <= new lo, append to end
      (cond
        [(<= (car measure) lo)
-        (interval-tree (consR:impl interval-config ft interval 0) (add1 cnt))]
+        (interval-tree (consR:impl interval-config ft interval 0) (add1 cnt))
+        ]
        [else
         ;; Split at first interval with lo' > lo
         (define (pred acc-measure)
           (and (not (eq? acc-measure interval-empty-measure))
-               (> (car acc-measure) lo)))
+               (> (car acc-measure) lo))
+          ) ; and: non-empty and greater
         (define-values (l elem r) (split:impl interval-config pred ft 0))
         (define new-ft
           (concat:impl interval-config
                        (consR:impl interval-config l interval 0)
                        (consL:impl interval-config r elem 0)
-                       0))
-        (interval-tree new-ft (add1 cnt))]
+                       0)
+          ) ; concat: l + interval + r
+        (interval-tree new-ft (add1 cnt))
+        ]
        ) ; cond: fast path / split path
      ]
     ) ; cond: empty tree
@@ -87,7 +102,8 @@
   (match ft
     [(ft:empty) interval-empty-measure]
     [(ft:single a) ((ft:config-measure interval-config) a)]
-    [(ft:deep v _ _ _) v]))
+    [(ft:deep v _ _ _) v]
+    ))
 
 ;; ========================================
 ;; Search - O(log n + k)
@@ -103,7 +119,11 @@
 
 (define (interval-tree-search it qlo qhi)
   (match-define (interval-tree ft _) it)
-  (reverse (search-ft ft qlo qhi 0 '())))
+  (define acc0 '())
+  (define out-rev
+    (search-ft ft qlo qhi 0 acc0))
+  (reverse out-rev)
+  )
 
 ;; Accumulator-based search (returns reversed result)
 (define (search-ft ft qlo qhi depth acc)
@@ -114,15 +134,16 @@
          (if (interval-overlaps? elem qlo qhi)
              (cons elem acc)
              acc)
-         (search-node elem qlo qhi depth acc))]
+         (search-node elem qlo qhi depth acc))
+     ]
     [(ft:deep (cons min-lo max-hi) left inner right)
      ;; Pruning
      (cond
        [(< max-hi qlo) acc]  ; no interval can overlap
        [(> min-lo qhi) acc]  ; all intervals start after query end
        [else
-       (define acc1 (search-digit left qlo qhi depth acc))
-       (define acc2 (search-ft inner qlo qhi (add1 depth) acc1))
+        (define acc1 (search-digit left qlo qhi depth acc))
+        (define acc2 (search-ft inner qlo qhi (add1 depth) acc1))
         (search-digit right qlo qhi depth acc2)]
        ) ; cond: pruning
      ]
@@ -136,7 +157,10 @@
           (if (interval-overlaps? elem qlo qhi)
               (cons elem a)
               a)
-          (search-node elem qlo qhi depth a)))))
+          (search-node elem qlo qhi depth a))
+      ) ; if: depth
+    ) ; lambda: fold step
+  ) ; digit-fold-left
 
 (define (search-node node qlo qhi depth acc)
   (match node
@@ -169,11 +193,13 @@
           (cons child acc)
           acc)
       ;; Child is a node
-      (search-node child qlo qhi (sub1 depth) acc)))
+      (search-node child qlo qhi (sub1 depth) acc))
+  )
 
 (define (interval-overlaps? interval qlo qhi)
   (and (<= (car interval) qhi)
-       (>= (cadr interval) qlo)))
+       (>= (cadr interval) qlo))
+  )
 
 ;; ========================================
 ;; Delete - O(log n)
@@ -209,12 +235,14 @@
      ;; Predicate 1: lo > target-lo
      (define (pred> acc)
        (and (not (eq? acc interval-empty-measure))
-            (> (car acc) target-lo)))
+            (> (car acc) target-lo))
+       )
 
      ;; Predicate 2: lo >= target-lo
      (define (pred>= acc)
        (and (not (eq? acc interval-empty-measure))
-            (>= (car acc) target-lo)))
+            (>= (car acc) target-lo))
+       )
 
      ;; Check if there are any intervals with lo > target-lo
      (define has-greater (> (car measure) target-lo))
@@ -225,9 +253,15 @@
         ;; Split at lo >= target-lo to get intervals with lo = target-lo at the end
         (if (>= (car measure) target-lo)
             ;; There exist intervals with lo >= target-lo
-            (let-values ([(before first-ge after) (split:impl interval-config pred>= ft 0)])
-              ;; first-ge has lo = target-lo, search from here
-              (delete-in-suffix (consL:impl interval-config after first-ge 0) target before))
+            (let ()
+              (define split-res
+                (split:impl interval-config pred>= ft 0))
+              (let-values ([(before first-ge after) split-res])
+                ;; first-ge has lo = target-lo, search from here
+                (delete-in-suffix (consL:impl interval-config after first-ge 0)
+                                  target
+                                  before))
+              ) ; let: split-res
             #f)]
        [else
         ;; Split at lo > target-lo
@@ -277,7 +311,11 @@
      (define-values (first rest) (hdL:impl interval-config ft 0))
      (cond
        [(equal? first target) rest]
-       [(not (= (car first) (car target))) #f]  ; different lo, stop
+       [(let ()
+          (define lo-first (car first))
+          (define lo-target (car target))
+          (not (= lo-first lo-target))
+          ) #f]  ; different lo, stop
        [else
        (define new-rest (delete-exact-from-list rest target))
        (if new-rest
@@ -307,16 +345,24 @@
 ;; ========================================
 
 (define (list->interval-tree lst)
-  (for/fold ([it (interval-tree-empty)]) ([elem lst])
+  (define it0 (interval-tree-empty))
+  (for/fold ([it it0]) ([elem lst])
     (match elem
       [(list lo hi value)
        (interval-tree-insert it lo hi value)]
       [(cons (cons lo hi) value)
-       (interval-tree-insert it lo hi value)])))
+       (interval-tree-insert it lo hi value)]
+      ) ; match: elem
+    ) ; for/fold
+  )
 
 (define (interval-tree->list it)
   (match-define (interval-tree ft _) it)
-  (reverse (ft->list-acc ft 0 '())))
+  (define acc0 '())
+  (define out-rev
+    (ft->list-acc ft 0 acc0))
+  (reverse out-rev)
+  )
 
 (define (ft->list-acc ft depth acc)
   (match ft
@@ -324,7 +370,8 @@
     [(ft:single elem)
      (if (= depth 0)
          (cons elem acc)
-         (node->list-acc elem depth acc))]
+         (node->list-acc elem depth acc))
+     ]
     [(ft:deep _ left inner right)
      (define acc1 (digit->list-acc left depth acc))
      (define acc2 (ft->list-acc inner (add1 depth) acc1))
@@ -337,7 +384,10 @@
     (lambda (a elem)
       (if (= depth 0)
           (cons elem a)
-          (node->list-acc elem depth a)))))
+          (node->list-acc elem depth a))
+      ) ; if: depth
+    ) ; lambda: fold step
+  ) ; digit-fold-left
 
 (define (node->list-acc node depth acc)
   (match node
@@ -345,13 +395,20 @@
      (if (= depth 1)
          (cons b (cons a acc))
          (node->list-acc b (sub1 depth)
-                         (node->list-acc a (sub1 depth) acc)))]
+                         (node->list-acc a (sub1 depth) acc))
+         )] ; if: depth=1
     [(node:3 _ a b c)
      (if (= depth 1)
-         (cons c (cons b (cons a acc)))
+         (let ()
+           (define a+acc (cons a acc))
+           (define b+a+acc (cons b a+acc))
+           (cons c b+a+acc)
+           )
          (node->list-acc c (sub1 depth)
                          (node->list-acc b (sub1 depth)
-                                         (node->list-acc a (sub1 depth) acc))))]
+                                         (node->list-acc a (sub1 depth) acc))
+                         )
+         )] ; if: depth=1
     ) ; match: node
   ) ; define node->list-acc
 

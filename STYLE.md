@@ -45,8 +45,9 @@ Only add these comments where they materially reduce pairing ambiguity.
 
 Phase 1 uses a lightweight repository script that reports dense closing
 parenthesis runs. It defaults to warning-oriented checks for runs of three or
-more closers on a line, with a small number of built-in exemptions for simple
-structural patterns such as compact binding-clause lines.
+more closers on a code line (before comments, and excluding string literal
+content), with AST-driven syntax+semantic-aware exemptions for narrow structural patterns
+such as compact `for` clause/header lines.
 
 Recommended commands:
 

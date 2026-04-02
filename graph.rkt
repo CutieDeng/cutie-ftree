@@ -70,13 +70,18 @@
 
 ;; Check if vertex exists
 (define (graph-vertex? g v)
-  (and (vertex-id? v)
-       (graph-vertex?-impl g (vertex-id-val v)))
+  (if (vertex-id? v)
+      (let ()
+        (define vid (vertex-id-val v))
+        (graph-vertex?-impl g vid))
+      #f)
   ) ; define graph-vertex?
 
 ;; Get all vertices as pvector of vertex-id
 (define (graph-vertices-set g)
-  (for/pvector ([v (in-bitset (graph-vertices-set-impl g))])
+  (define vertices (graph-vertices-set-impl g))
+  (define vertices-seq (in-bitset vertices))
+  (for/pvector ([v vertices-seq])
     (vertex-id v))
   ) ; define graph-vertices-set
 
@@ -110,10 +115,12 @@
   (define in-e (graph-in-edges-impl g vid))
   (define out-e (graph-out-edges-impl g vid))
   (define all-edges (bitset-union in-e out-e))
+  (define all-edges-seq (in-bitset all-edges))
 
   ;; Remove all edges first
   (define g1
-    (for/fold ([g g]) ([eid (in-bitset all-edges)])
+    (for/fold ([g g])
+              ([eid all-edges-seq])
       (if (graph-edge?-impl g eid)
           (graph-remove-edge-impl g eid)
           g))
@@ -131,8 +138,10 @@
 (define (graph-add-edge g src dst)
   (check-vertex-id 'graph-add-edge g src 1)
   (check-vertex-id 'graph-add-edge g dst 2)
+  (define src-id (vertex-id-val src))
+  (define dst-id (vertex-id-val dst))
   (define-values (g* eid)
-    (graph-add-edge-impl g (vertex-id-val src) (vertex-id-val dst)))
+    (graph-add-edge-impl g src-id dst-id))
   (values g* (edge-id eid))
   ) ; define graph-add-edge
 
@@ -140,20 +149,27 @@
 (define (graph-add-edge-pair g v1 v2)
   (check-vertex-id 'graph-add-edge-pair g v1 1)
   (check-vertex-id 'graph-add-edge-pair g v2 2)
+  (define v1-id (vertex-id-val v1))
+  (define v2-id (vertex-id-val v2))
   (define-values (g* e1 e2)
-    (graph-add-edge-pair-impl g (vertex-id-val v1) (vertex-id-val v2)))
+    (graph-add-edge-pair-impl g v1-id v2-id))
   (values g* (edge-id e1) (edge-id e2))
   ) ; define graph-add-edge-pair
 
 ;; Check if edge exists
 (define (graph-edge? g e)
-  (and (edge-id? e)
-       (graph-edge?-impl g (edge-id-val e)))
+  (if (edge-id? e)
+      (let ()
+        (define eid (edge-id-val e))
+        (graph-edge?-impl g eid))
+      #f)
   ) ; define graph-edge?
 
 ;; Get all edges as pvector of edge-id
 (define (graph-edges-set g)
-  (for/pvector ([e (in-bitset (graph-edges-set-impl g))])
+  (define edges (graph-edges-set-impl g))
+  (define edges-seq (in-bitset edges))
+  (for/pvector ([e edges-seq])
     (edge-id e))
   ) ; define graph-edges-set
 
@@ -165,28 +181,32 @@
 ;; Get edge source vertex
 (define (graph-edge-src g e)
   (check-edge-id 'graph-edge-src g e 1)
-  (define v (graph-edge-src-impl g (edge-id-val e)))
+  (define eid (edge-id-val e))
+  (define v (graph-edge-src-impl g eid))
   (vertex-id v)
   ) ; define graph-edge-src
 
 ;; Get edge destination vertex
 (define (graph-edge-dst g e)
   (check-edge-id 'graph-edge-dst g e 1)
-  (define v (graph-edge-dst-impl g (edge-id-val e)))
+  (define eid (edge-id-val e))
+  (define v (graph-edge-dst-impl g eid))
   (vertex-id v)
   ) ; define graph-edge-dst
 
 ;; Get edge endpoints as (values src dst)
 (define (graph-edge-endpoints g e)
   (check-edge-id 'graph-edge-endpoints g e 1)
-  (define-values (src dst) (graph-edge-endpoints-impl g (edge-id-val e)))
+  (define eid (edge-id-val e))
+  (define-values (src dst) (graph-edge-endpoints-impl g eid))
   (values (vertex-id src) (vertex-id dst))
   ) ; define graph-edge-endpoints
 
 ;; Get paired edge (or #f)
 (define (graph-edge-pair g e)
   (check-edge-id 'graph-edge-pair g e 1)
-  (define paired (graph-edge-pair-impl g (edge-id-val e)))
+  (define eid (edge-id-val e))
+  (define paired (graph-edge-pair-impl g eid))
   (and paired (edge-id paired))
   ) ; define graph-edge-pair
 
@@ -206,15 +226,18 @@
 (define (graph-remove-edge-between g src dst)
   (check-vertex-id 'graph-remove-edge-between g src 1)
   (check-vertex-id 'graph-remove-edge-between g dst 2)
+  (define src-id (vertex-id-val src))
+  (define dst-id (vertex-id-val dst))
   (define edges
-    (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))
+    (graph-edges-between-impl g src-id dst-id))
   (cond
     [(bitset-empty? edges)
      (error 'graph-remove-edge-between "no edge from ~a to ~a" src dst)]
     [(> (bitset-count edges) 1)
      (error 'graph-remove-edge-between "multiple edges from ~a to ~a, use graph-remove-edges-between" src dst)]
     [else
-     (graph-remove-edge-impl g (bitset-min edges))]
+     (define eid (bitset-min edges))
+     (graph-remove-edge-impl g eid)]
     ) ; cond: edge multiplicity
   ) ; define graph-remove-edge-between
 
@@ -222,9 +245,13 @@
 (define (graph-remove-edges-between g src dst)
   (check-vertex-id 'graph-remove-edges-between g src 1)
   (check-vertex-id 'graph-remove-edges-between g dst 2)
+  (define src-id (vertex-id-val src))
+  (define dst-id (vertex-id-val dst))
   (define edges
-    (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))
-  (for/fold ([g g]) ([eid (in-bitset edges)])
+    (graph-edges-between-impl g src-id dst-id))
+  (define edges-seq (in-bitset edges))
+  (for/fold ([g g])
+            ([eid edges-seq])
     (graph-remove-edge-impl g eid))
   ) ; define graph-remove-edges-between
 
@@ -235,32 +262,44 @@
 ;; Get in-edges of vertex as pvector of edge-id
 (define (graph-in-edges g v)
   (check-vertex-id 'graph-in-edges g v 1)
-  (for/pvector ([e (in-bitset (graph-in-edges-impl g (vertex-id-val v)))])
+  (define vid (vertex-id-val v))
+  (define edges (graph-in-edges-impl g vid))
+  (define edges-seq (in-bitset edges))
+  (for/pvector ([e edges-seq])
     (edge-id e))
   ) ; define graph-in-edges
 
 ;; Get out-edges of vertex as pvector of edge-id
 (define (graph-out-edges g v)
   (check-vertex-id 'graph-out-edges g v 1)
-  (for/pvector ([e (in-bitset (graph-out-edges-impl g (vertex-id-val v)))])
+  (define vid (vertex-id-val v))
+  (define edges (graph-out-edges-impl g vid))
+  (define edges-seq (in-bitset edges))
+  (for/pvector ([e edges-seq])
     (edge-id e))
   ) ; define graph-out-edges
 
 ;; Get in-degree
 (define (graph-in-degree g v)
   (check-vertex-id 'graph-in-degree g v 1)
-  (graph-in-degree-impl g (vertex-id-val v)))
+  (define vid (vertex-id-val v))
+  (graph-in-degree-impl g vid))
 
 ;; Get out-degree
 (define (graph-out-degree g v)
   (check-vertex-id 'graph-out-degree g v 1)
-  (graph-out-degree-impl g (vertex-id-val v)))
+  (define vid (vertex-id-val v))
+  (graph-out-degree-impl g vid))
 
 ;; Get edges from src to dst as pvector of edge-id
 (define (graph-edges-between g src dst)
   (check-vertex-id 'graph-edges-between g src 1)
   (check-vertex-id 'graph-edges-between g dst 2)
-  (for/pvector ([e (in-bitset (graph-edges-between-impl g (vertex-id-val src) (vertex-id-val dst)))])
+  (define src-id (vertex-id-val src))
+  (define dst-id (vertex-id-val dst))
+  (define edges (graph-edges-between-impl g src-id dst-id))
+  (define edges-seq (in-bitset edges))
+  (for/pvector ([e edges-seq])
     (edge-id e))
   ) ; define graph-edges-between
 
@@ -268,19 +307,27 @@
 (define (graph-has-edge-to? g src dst)
   (check-vertex-id 'graph-has-edge-to? g src 1)
   (check-vertex-id 'graph-has-edge-to? g dst 2)
-  (graph-has-edge-to?-impl g (vertex-id-val src) (vertex-id-val dst)))
+  (define src-id (vertex-id-val src))
+  (define dst-id (vertex-id-val dst))
+  (graph-has-edge-to?-impl g src-id dst-id))
 
 ;; Get successor vertices as pvector of vertex-id
 (define (graph-successors g v)
   (check-vertex-id 'graph-successors g v 1)
-  (for/pvector ([vid (in-bitset (graph-successors-impl g (vertex-id-val v)))])
+  (define v-id (vertex-id-val v))
+  (define vids (graph-successors-impl g v-id))
+  (define vids-seq (in-bitset vids))
+  (for/pvector ([vid vids-seq])
     (vertex-id vid))
   ) ; define graph-successors
 
 ;; Get predecessor vertices as pvector of vertex-id
 (define (graph-predecessors g v)
   (check-vertex-id 'graph-predecessors g v 1)
-  (for/pvector ([vid (in-bitset (graph-predecessors-impl g (vertex-id-val v)))])
+  (define v-id (vertex-id-val v))
+  (define vids (graph-predecessors-impl g v-id))
+  (define vids-seq (in-bitset vids))
+  (for/pvector ([vid vids-seq])
     (vertex-id vid))
   ) ; define graph-predecessors
 
@@ -293,16 +340,20 @@
 ;; Iterate over vertex-ids
 (define (in-graph-vertices g)
   (in-generator
-    (for ([v (in-bitset (graph-vertices-set-impl g))])
-      (yield (vertex-id v)))
+    (define vertices (graph-vertices-set-impl g))
+    (for ([v (in-bitset vertices)])
+      (define v^ (vertex-id v))
+      (yield v^))
     ) ; in-generator
   ) ; define in-graph-vertices
 
 ;; Iterate over edge-ids
 (define (in-graph-edges g)
   (in-generator
-    (for ([e (in-bitset (graph-edges-set-impl g))])
-      (yield (edge-id e)))
+    (define edges (graph-edges-set-impl g))
+    (for ([e (in-bitset edges)])
+      (define e^ (edge-id e))
+      (yield e^))
     ) ; in-generator
   ) ; define in-graph-edges
 
@@ -311,9 +362,14 @@
   (check-vertex-id 'in-graph-out-edges g v 1)
   (define vid (vertex-id-val v))
   (in-generator
-    (for ([eid (in-bitset (graph-out-edges-impl g vid))])
+    (define out-edges (graph-out-edges-impl g vid))
+    (for ([eid (in-bitset out-edges)])
       (define-values (src dst) (graph-edge-endpoints-impl g eid))
-      (yield (values (edge-id eid) (vertex-id src) (vertex-id dst))))
+      (define eid^ (edge-id eid))
+      (define src^ (vertex-id src))
+      (define dst^ (vertex-id dst))
+      (define triple (values eid^ src^ dst^))
+      (yield triple))
     ) ; in-generator
   ) ; define in-graph-out-edges
 
@@ -321,8 +377,11 @@
 (define (in-graph-successors g v)
   (check-vertex-id 'in-graph-successors g v 1)
   (in-generator
-    (for ([vid (in-bitset (graph-successors-impl g (vertex-id-val v)))])
-      (yield (vertex-id vid)))
+    (define v-id (vertex-id-val v))
+    (define succs (graph-successors-impl g v-id))
+    (for ([vid (in-bitset succs)])
+      (define v^ (vertex-id vid))
+      (yield v^))
     ) ; in-generator
   ) ; define in-graph-successors
 
@@ -330,8 +389,11 @@
 (define (in-graph-predecessors g v)
   (check-vertex-id 'in-graph-predecessors g v 1)
   (in-generator
-    (for ([vid (in-bitset (graph-predecessors-impl g (vertex-id-val v)))])
-      (yield (vertex-id vid)))
+    (define v-id (vertex-id-val v))
+    (define preds (graph-predecessors-impl g v-id))
+    (for ([vid (in-bitset preds)])
+      (define v^ (vertex-id vid))
+      (yield v^))
     ) ; in-generator
   ) ; define in-graph-predecessors
 

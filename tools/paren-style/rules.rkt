@@ -4,6 +4,7 @@
          racket/list
          "types.rkt"
          "text.rkt"
+         "ast.rkt"
          "rules-config.rkt"
          "exemptions.rkt")
 
@@ -43,10 +44,12 @@
                          (not (member (rule-id r) disabled))))
     r))
 
-(define (line->context path line line-number)
+(define (line->context path line line-number line-kinds)
   (define code-prefix (comment-prefix line))
   (define run-length (max-closing-run code-prefix))
-  (line-context path line-number line code-prefix run-length))
+  (define semantic-kind (semantic-kind-for-line line-kinds line-number))
+  (define semantic-tags (semantic-tags-for-line line-kinds line-number))
+  (line-context path line-number line code-prefix run-length semantic-kind semantic-tags))
 
 (define (line-violations ctx cfg rules)
   (for/list ([r (in-list rules)]
@@ -61,10 +64,11 @@
 (define (scan-file path cfg)
   (define rules (active-rules cfg))
   (define lines (file->lines path))
+  (define line-kinds (build-ast-line-kinds path))
   (append*
    (for/list ([line (in-list lines)]
               [line-number (in-naturals 1)])
-     (line-violations (line->context path line line-number) cfg rules))))
+     (line-violations (line->context path line line-number line-kinds) cfg rules))))
 
 (define (scan-files paths cfg)
   (append* (for/list ([p (in-list paths)])

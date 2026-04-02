@@ -28,7 +28,9 @@
    line-number
    raw-line
    code-prefix
-   run-length)
+   run-length
+   semantic-kind
+   semantic-tags)
   #:transparent)
 
 (struct rule

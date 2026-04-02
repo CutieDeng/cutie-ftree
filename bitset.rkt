@@ -53,7 +53,11 @@
   ) ; define bitset-add
 
 (define (bitset-remove s n)
-  (bitwise-and s (bitwise-not (arithmetic-shift 1 n)))
+  (bitwise-and s
+               (bitwise-not
+                (arithmetic-shift 1 n)
+                ) ; bitwise-not
+               ) ; bitwise-and
   ) ; define bitset-remove
 
 ;; ========================================
@@ -77,19 +81,29 @@
   (cond
     ;; Fast path for fixnum-sized integers (use bit manipulation tricks)
     [(<= s #xFFFFFFFFFFFFFFFF)  ; 64-bit
-     (let* ([s (- s (bitwise-and (arithmetic-shift s -1) #x5555555555555555))]
+     (let* ([s (- s
+                  (bitwise-and (arithmetic-shift s -1) #x5555555555555555)
+                  )]
             [s (+ (bitwise-and s #x3333333333333333)
-                  (bitwise-and (arithmetic-shift s -2) #x3333333333333333))]
+                  (bitwise-and (arithmetic-shift s -2) #x3333333333333333)
+                  )]
             [s (bitwise-and (+ s (arithmetic-shift s -4)) #x0F0F0F0F0F0F0F0F)]
-            [s (* s #x0101010101010101)])
-       (bitwise-and (arithmetic-shift s -56) #xFF))]
+            [s (* s #x0101010101010101)
+               ])
+       (bitwise-and (arithmetic-shift s -56) #xFF)
+       )]
     ;; Fallback for bignum: process 64 bits at a time
     [else
      (let loop ([s s] [count 0])
        (if (zero? s)
            count
            (loop (arithmetic-shift s -64)
-                 (+ count (bitset-count (bitwise-and s #xFFFFFFFFFFFFFFFF))))
+                 (+ count
+                    (bitset-count
+                     (bitwise-and s #xFFFFFFFFFFFFFFFF)
+                     )
+                    )
+                 )
            ) ; if: zero? s
        ) ; let loop
      ]
@@ -103,7 +117,11 @@
 ;; Minimum element (rightmost bit)
 ;; Precondition: s != 0
 (define (bitset-min s)
-  (sub1 (integer-length (bitwise-and s (- s))))
+  (sub1
+   (integer-length
+    (bitwise-and s (- s))
+    ) ; integer-length
+   ) ; sub1
   ) ; define bitset-min
 
 ;; Maximum element (leftmost bit)
@@ -125,7 +143,13 @@
         #:pos->element bitset-min
         #:continue-with-pos? (compose not zero?)
         #:next-pos (lambda (s)
-                     (bitwise-xor s (arithmetic-shift 1 (bitset-min s))))
+                     (bitwise-xor s
+                                  (arithmetic-shift
+                                   1
+                                   (bitset-min s)
+                                   ) ; arithmetic-shift
+                                  ) ; bitwise-xor
+                     ) ; lambda: next-pos
         ) ; initiate-sequence
       ) ; lambda
     ) ; make-do-sequence
@@ -140,7 +164,13 @@
         #:pos->element bitset-max
         #:continue-with-pos? (compose not zero?)
         #:next-pos (lambda (s)
-                     (bitwise-xor s (arithmetic-shift 1 (bitset-max s))))
+                     (bitwise-xor s
+                                  (arithmetic-shift
+                                   1
+                                   (bitset-max s)
+                                   ) ; arithmetic-shift
+                                  ) ; bitwise-xor
+                     ) ; lambda: next-pos
         ) ; initiate-sequence
       ) ; lambda
     ) ; make-do-sequence
@@ -215,29 +245,51 @@
   #:methods gen:set
   [(define (set-member? sw v)
      (and (exact-nonnegative-integer? v)
-          (bitset-member? (bitset-wrapper-bits sw) v)))
+          (bitset-member?
+           (bitset-wrapper-bits sw)
+           v)
+          ))
    (define (set-empty? sw)
-     (bitset-empty? (bitset-wrapper-bits sw)))
+     (bitset-empty?
+      (bitset-wrapper-bits sw)
+      ))
    (define (set-count sw)
-     (bitset-count (bitset-wrapper-bits sw)))
+     (bitset-count
+      (bitset-wrapper-bits sw)
+      ))
    (define (set-add sw v)
      (bitset-wrapper
-      (bitset-add (bitset-wrapper-bits sw) v)))
+      (bitset-add
+       (bitset-wrapper-bits sw)
+       v)
+      ))
    (define (set-remove sw v)
      (bitset-wrapper
-      (bitset-remove (bitset-wrapper-bits sw) v)))
+      (bitset-remove
+       (bitset-wrapper-bits sw)
+       v)
+      ))
    (define (set->stream sw)
      (sequence->stream
-      (in-bitset (bitset-wrapper-bits sw))))
+      (in-bitset
+       (bitset-wrapper-bits sw))
+      ))
    (define (in-set sw)
-     (in-bitset (bitset-wrapper-bits sw)))]
+     (in-bitset
+      (bitset-wrapper-bits sw))
+     )]
   #:methods gen:equal+hash
   [(define (equal-proc sw1 sw2 rec)
-     (= (bitset-wrapper-bits sw1) (bitset-wrapper-bits sw2)))
+     (= (bitset-wrapper-bits sw1)
+        (bitset-wrapper-bits sw2)
+        ))
    (define (hash-proc sw rec)
-     (rec (bitset-wrapper-bits sw)))
+     (rec (bitset-wrapper-bits sw))
+     )
    (define (hash2-proc sw rec)
-     (rec (bitset-wrapper-bits sw)))])
+     (rec (bitset-wrapper-bits sw))
+     )
+   ])
 
 ;; Convert to gen:set compatible wrapper
 (define (bitset->set s)
@@ -261,9 +313,12 @@
 (define (bitset-pop-min-helper s)
   (if (zero? s)
       #f
-      (let ([m (bitset-min s)])
-        (cons m (bitset-remove s m)))
-      ) ; let
+      (let ([m (bitset-min s)
+               ])
+        (cons m
+              (bitset-remove s m)
+              )
+        ))
   ) ; define bitset-pop-min-helper
 
 (define-match-expander bitset-cons
@@ -272,7 +327,8 @@
       [(_ min-pat rest-pat)
        #'(? bitset?
            (app bitset-pop-min-helper
-                (cons min-pat rest-pat)))]
+                (cons min-pat rest-pat))
+           )]
       ) ; syntax-case
     ) ; lambda
   ) ; define-match-expander bitset-cons
@@ -282,9 +338,12 @@
 (define (bitset-pop-max-helper s)
   (if (zero? s)
       #f
-      (let ([m (bitset-max s)])
-        (cons m (bitset-remove s m)))
-      ) ; let
+      (let ([m (bitset-max s)
+               ])
+        (cons m
+              (bitset-remove s m)
+              )
+        ))
   ) ; define bitset-pop-max-helper
 
 (define-match-expander bitset-rev
@@ -293,7 +352,8 @@
       [(_ max-pat rest-pat)
        #'(? bitset?
            (app bitset-pop-max-helper
-                (cons max-pat rest-pat)))]
+                (cons max-pat rest-pat))
+           )]
       ) ; syntax-case
     ) ; lambda
   ) ; define-match-expander bitset-rev
@@ -306,7 +366,9 @@
       [(_ n ...)
        #'(? bitset?
            (? (lambda (s)
-                (and (bitset-member? s n) ...))))]
+                (and (bitset-member? s n) ...))
+              )
+           )]
       ) ; syntax-case
     ) ; lambda
   ) ; define-match-expander bitset-has
@@ -321,14 +383,18 @@
       [(_ n ...)
        #'(? bitset?
            (? (lambda (s)
-                (and (bitset-member? s n) ...))))]
+                (and (bitset-member? s n) ...))
+              )
+           )]
       ) ; syntax-case
     ) ; lambda match-transformer
   ;; Expression transformer (constructor)
   (lambda (stx)
     (syntax-case stx ()
       [(_ elem ...)
-       #'(list->bitset* (list elem ...))]
+       #'(list->bitset*
+          (list elem ...)
+          )]
       ) ; syntax-case
     ) ; lambda expression-transformer
   ) ; define-match-expander bitset*
