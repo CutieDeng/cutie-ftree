@@ -11,8 +11,9 @@
 
 (test-case "empty interval tree"
   (define it (interval-tree-empty))
+  (define empty-result '())
   (check-true (interval-tree-empty? it))
-  (check-equal? (interval-tree-search it 0 10) '()))
+  (check-equal? (interval-tree-search it 0 10) empty-result))
 
 (test-case "single interval"
   (define it (interval-tree-empty))
@@ -20,16 +21,20 @@
   (check-false (interval-tree-empty? it2))
 
   ;; Query that overlaps
+  (define hit-a-item (list 5 10 "a"))
+  (define hit-a
+    (list hit-a-item))
   (check-equal? (length (interval-tree-search it2 7 8)) 1)
-  (check-equal? (interval-tree-search it2 7 8) '((5 10 "a")))
+  (check-equal? (interval-tree-search it2 7 8) hit-a)
 
   ;; Query at boundary
   (check-equal? (length (interval-tree-search it2 10 15)) 1)
   (check-equal? (length (interval-tree-search it2 0 5)) 1)
 
   ;; Query that doesn't overlap
+  (define empty-result '())
   (check-equal? (interval-tree-search it2 11 15) '())
-  (check-equal? (interval-tree-search it2 0 4) '()))
+  (check-equal? (interval-tree-search it2 0 4) empty-result))
 
 (test-case "multiple non-overlapping intervals"
   (define it (interval-tree-empty))
@@ -76,7 +81,11 @@
   (check-equal? (length (interval-tree-search-point it3 20)) 0))
 
 (test-case "list conversion"
-  (define lst '((1 5 "a") (3 7 "b") (10 20 "c")))
+  (define a (list 1 5 "a"))
+  (define b (list 3 7 "b"))
+  (define c (list 10 20 "c"))
+  (define lst
+    (list a b c))
   (define it (list->interval-tree lst))
 
   (check-equal? (length (interval-tree->list it)) 3)
@@ -86,9 +95,12 @@
 (test-case "large tree"
   (define n 100)
   ;; Create n intervals: [i, i+10]
+  (define t0 (interval-tree-empty))
+  (define i-seq (in-range n))
   (define it
-    (for/fold ([t (interval-tree-empty)]) ([i (in-range n)])
-      (interval-tree-insert t i (+ i 10) i)))
+    (for/fold ([t t0]) ([i i-seq])
+      (interval-tree-insert t i (+ i 10) i)
+      ))
 
   ;; Query at point 50 should hit intervals 40-50
   (define results (interval-tree-search-point it 50))
@@ -98,7 +110,12 @@
   (check-equal? (length (interval-tree-search-point it 5)) 6)
 
   ;; Range query
-  (check-true (> (length (interval-tree-search it 45 55)) 10)))
+  (define query-results
+    (interval-tree-search it 45 55))
+  (define query-hit-count
+    (length query-results))
+  (define enough-hits? (> query-hit-count 10))
+  (check-true enough-hits?))
 
 (test-case "immutability"
   (define it1 (interval-tree-empty))

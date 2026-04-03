@@ -17,14 +17,24 @@
 ;; Returns (values graph vertex-id-list)
 (define (build-graph-from-adj adj-list)
   (define n (length adj-list))
+  (define vertex-idx-seq
+    (in-range n))
+  (define empty-verts
+    '())
   ;; Add vertices
   (define-values (g vertices)
     (for/fold ([g graph-empty]
-               [verts '()])
-              ([_ (in-range n)])
+               [verts empty-verts])
+              ([_ vertex-idx-seq])
       (define-values (g* v) (graph-add-vertex g))
-      (values g* (cons v verts))))
-  (define vertex-vec (list->vector (reverse vertices)))
+      (define next-verts
+        (cons v verts))
+      (values g* next-verts)
+      ))
+  (define rev-vertices
+    (reverse vertices))
+  (define vertex-vec
+    (list->vector rev-vertices))
 
   ;; Add edges
   (define final-g
@@ -32,14 +42,23 @@
               ([entry adj-list])
       (define src-idx (car entry))
       (define dst-indices (cdr entry))
+      (define src-v
+        (vector-ref vertex-vec src-idx))
       (for/fold ([g* g])
                 ([dst-idx dst-indices])
+        (define dst-v
+          (vector-ref vertex-vec dst-idx))
         (define-values (g** _) (graph-add-edge g*
-                                               (vector-ref vertex-vec src-idx)
-                                               (vector-ref vertex-vec dst-idx)))
-        g**)))
+                                               src-v
+                                               dst-v))
+        g**
+        )
+      )
+    )
 
-  (values final-g (vector->list vertex-vec)))
+  (define vertex-list
+    (vector->list vertex-vec))
+  (values final-g vertex-list))
 
 ;; Convert pvector[bitset] to list[list[int]] for easier comparison
 (define (sccs->lists sccs)
@@ -59,7 +78,13 @@
   (define sccs (graph-scc g))
   (check-equal? (pvector-length sccs) 1)
   (check-equal? (bitset-count (pvector-ref sccs 0)) 1)
-  (check-true (bitset-member? (pvector-ref sccs 0) (vertex-id-val v))))
+  (define scc0
+    (pvector-ref sccs 0))
+  (define v-id
+    (vertex-id-val v))
+  (define has-v?
+    (bitset-member? scc0 v-id))
+  (check-true has-v?))
 
 (test-case "scc-two-disconnected-vertices"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -73,36 +98,72 @@
 (test-case "scc-simple-chain"
   ;; 0 -> 1 -> 2
   ;; Three SCCs: {0}, {1}, {2}
-  (define-values (g verts) (build-graph-from-adj '((0 . (1)) (1 . (2)) (2 . ()))))
+  (define no-out
+    '())
+  (define chain-adj
+    (list
+      (cons 0 '(1))
+      (cons 1 '(2))
+      (cons 2 no-out)
+      ))
+  (define-values (g verts)
+    (build-graph-from-adj chain-adj))
   (define sccs (graph-scc g))
   (check-equal? (pvector-length sccs) 3)
   ;; Reverse topo order: sink first
   ;; {2} is sink, {0} is source
   (define scc-lists (sccs->lists sccs))
   (check-equal? (car scc-lists) '(2))  ; sink SCC first
-  (check-equal? (last scc-lists) '(0)))  ; source SCC last
+  (define source-scc
+    (last scc-lists))
+  (define expected-source
+    '(0))
+  (check-equal? source-scc expected-source))  ; source SCC last
 
 (test-case "scc-simple-cycle"
   ;; 0 -> 1 -> 2 -> 0 (cycle)
   ;; One SCC: {0, 1, 2}
-  (define-values (g verts) (build-graph-from-adj '((0 . (1)) (1 . (2)) (2 . (0)))))
+  (define cycle-adj
+    (list
+      (cons 0 '(1))
+      (cons 1 '(2))
+      (cons 2 '(0))
+      ))
+  (define-values (g verts)
+    (build-graph-from-adj cycle-adj))
   (define sccs (graph-scc g))
   (check-equal? (pvector-length sccs) 1)
   (check-equal? (bitset-count (pvector-ref sccs 0)) 3)
   (define scc-lists (sccs->lists sccs))
-  (check-equal? (car scc-lists) '(0 1 2)))
+  (define only-scc
+    (car scc-lists))
+  (define expected-scc
+    '(0 1 2))
+  (check-equal? only-scc expected-scc))
 
 (test-case "scc-two-cycles-connected"
   ;; 0 -> 1 -> 0  (cycle1: {0,1})
   ;; 1 -> 2 -> 3 -> 2 (cycle2: {2,3})
   ;; Two SCCs: {0,1} and {2,3}
-  (define-values (g verts) (build-graph-from-adj '((0 . (1)) (1 . (0 2)) (2 . (3)) (3 . (2)))))
+  (define two-cycles-adj
+    (list
+      (cons 0 '(1))
+      (cons 1 '(0 2))
+      (cons 2 '(3))
+      (cons 3 '(2))
+      ))
+  (define-values (g verts)
+    (build-graph-from-adj two-cycles-adj))
   (define sccs (graph-scc g))
   (check-equal? (pvector-length sccs) 2)
   (define scc-lists (sccs->lists sccs))
   ;; {2,3} is sink (no outgoing edges to other SCCs)
   (check-equal? (car scc-lists) '(2 3))
-  (check-equal? (cadr scc-lists) '(0 1)))
+  (define next-scc
+    (cadr scc-lists))
+  (define expected-next
+    '(0 1))
+  (check-equal? next-scc expected-next))
 
 (test-case "scc-classic-example"
   ;; Classic example with 8 vertices
@@ -118,16 +179,21 @@
   ;; 6 -> 4  (SCC3: {4,5,6})
   ;; 6 -> 7  (SCC4: {7})
   ;;
+  (define no-out
+    '())
+  (define classic-adj
+    (list
+      (cons 0 '(1))
+      (cons 1 '(2))
+      (cons 2 '(0 3))
+      (cons 3 '(4))
+      (cons 4 '(5))
+      (cons 5 '(6))
+      (cons 6 '(4 7))
+      (cons 7 no-out)
+      ))
   (define-values (g verts)
-    (build-graph-from-adj
-     '((0 . (1))
-       (1 . (2))
-       (2 . (0 3))
-       (3 . (4))
-       (4 . (5))
-       (5 . (6))
-       (6 . (4 7))
-       (7 . ()))))
+    (build-graph-from-adj classic-adj))
 
   (define sccs (graph-scc g))
   (check-equal? (pvector-length sccs) 4)
@@ -141,7 +207,11 @@
   (check-equal? (car scc-lists) '(7))
   (check-equal? (cadr scc-lists) '(4 5 6))
   (check-equal? (caddr scc-lists) '(3))
-  (check-equal? (cadddr scc-lists) '(0 1 2)))
+  (define source-scc
+    (cadddr scc-lists))
+  (define expected-source
+    '(0 1 2))
+  (check-equal? source-scc expected-source))
 
 ;; ========================================
 ;; Condensation Graph Tests
@@ -149,7 +219,16 @@
 
 (test-case "condensation-simple-chain"
   ;; 0 -> 1 -> 2
-  (define-values (g verts) (build-graph-from-adj '((0 . (1)) (1 . (2)) (2 . ()))))
+  (define no-out
+    '())
+  (define chain-adj
+    (list
+      (cons 0 '(1))
+      (cons 1 '(2))
+      (cons 2 no-out)
+      ))
+  (define-values (g verts)
+    (build-graph-from-adj chain-adj))
   (define-values (node->scc scc-nodes scc-successors) (graph-condensation g))
 
   ;; 3 SCCs
@@ -166,8 +245,16 @@
   (define scc-of-v0 (cdr q0))  ; SCC ID containing vertex 0
   (define scc-of-v1 (cdr q1))  ; SCC ID containing vertex 1
   (define scc-of-v2 (cdr q2))  ; SCC ID containing vertex 2
-  (check-true (not (= scc-of-v0 scc-of-v1)))
-  (check-true (not (= scc-of-v1 scc-of-v2)))
+  (define eq-v0-v1?
+    (= scc-of-v0 scc-of-v1))
+  (define eq-v1-v2?
+    (= scc-of-v1 scc-of-v2))
+  (define v0!=v1?
+    (not eq-v0-v1?))
+  (define v1!=v2?
+    (not eq-v1-v2?))
+  (check-true v0!=v1?)
+  (check-true v1!=v2?)
 
   ;; Check scc-successors
   ;; Graph: 0 -> 1 -> 2
@@ -176,25 +263,47 @@
   (check-true (bitset-member? succ-of-v0-scc scc-of-v1))
 
   (define succ-of-v1-scc (scc-successors scc-of-v1))
-  (check-true (bitset-member? succ-of-v1-scc scc-of-v2)))
+  (define has-v2?
+    (bitset-member? succ-of-v1-scc scc-of-v2))
+  (check-true has-v2?))
 
 (test-case "condensation-cycle"
   ;; 0 -> 1 -> 2 -> 0 (one SCC)
-  (define-values (g verts) (build-graph-from-adj '((0 . (1)) (1 . (2)) (2 . (0)))))
+  (define cycle-adj
+    (list
+      (cons 0 '(1))
+      (cons 1 '(2))
+      (cons 2 '(0))
+      ))
+  (define-values (g verts)
+    (build-graph-from-adj cycle-adj))
   (define-values (node->scc scc-nodes scc-successors) (graph-condensation g))
 
   ;; 1 SCC
   (check-equal? (pvector-length scc-nodes) 1)
 
   ;; All nodes map to same SCC
-  (define scc0 (cdr (ordered-map-query node->scc 0)))
-  (define scc1 (cdr (ordered-map-query node->scc 1)))
-  (define scc2 (cdr (ordered-map-query node->scc 2)))
+  (define q0
+    (ordered-map-query node->scc 0))
+  (define q1
+    (ordered-map-query node->scc 1))
+  (define q2
+    (ordered-map-query node->scc 2))
+  (define scc0
+    (cdr q0))
+  (define scc1
+    (cdr q1))
+  (define scc2
+    (cdr q2))
   (check-equal? scc0 scc1)
   (check-equal? scc1 scc2)
 
   ;; No successors (self-contained)
-  (check-true (bitset-empty? (scc-successors scc0))))
+  (define succ0
+    (scc-successors scc0))
+  (define succ0-empty?
+    (bitset-empty? succ0))
+  (check-true succ0-empty?))
 
 (test-case "condensation-diamond"
   ;;     1
@@ -203,8 +312,17 @@
   ;;    \ /
   ;;     2
   ;; All separate SCCs
+  (define no-out
+    '())
+  (define diamond-adj
+    (list
+      (cons 0 '(1 2))
+      (cons 1 '(3))
+      (cons 2 '(3))
+      (cons 3 no-out)
+      ))
   (define-values (g verts)
-    (build-graph-from-adj '((0 . (1 2)) (1 . (3)) (2 . (3)) (3 . ()))))
+    (build-graph-from-adj diamond-adj))
   (define-values (node->scc scc-nodes scc-successors) (graph-condensation g))
 
   ;; 4 SCCs
@@ -213,7 +331,10 @@
   ;; Check all have different SCC IDs
   (define ids
     (for/list ([i (in-range 4)])
-      (cdr (ordered-map-query node->scc i))))
+      (define q
+        (ordered-map-query node->scc i))
+      (cdr q)
+      ))
   (check-equal? (length (remove-duplicates ids)) 4))
 
 (displayln "All graph-scc tests passed!")

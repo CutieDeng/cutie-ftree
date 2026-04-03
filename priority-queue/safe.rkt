@@ -10,6 +10,12 @@
 
 (define priority-queue/c
   (flat-named-contract 'priority-queue priority-queue?))
+(define maybe-pair/c (or/c #f pair?))
+(define pq-pop-pair/c
+  (values priority-queue/c maybe-pair/c))
+(define pq-pop-value/c
+  (values priority-queue/c any/c))
+(define pair-list/c (listof pair?))
 
 ;; ========================================
 ;; Contract-Protected Exports
@@ -31,15 +37,15 @@
   [priority-queue-insert (-> priority-queue/c any/c any/c priority-queue/c)]
 
   ;; Peek (non-destructive)
-  [priority-queue-peek (-> priority-queue/c (or/c #f pair?))]
+  [priority-queue-peek (-> priority-queue/c maybe-pair/c)]
   [priority-queue-peek-value (-> priority-queue/c any/c)]
   [priority-queue-peek-priority (-> priority-queue/c any/c)]
 
   ;; Pop (extract minimum)
   [priority-queue-pop
-   (-> priority-queue/c (values priority-queue/c (or/c #f pair?)))]
-  [priority-queue-pop-value (-> priority-queue/c (values priority-queue/c any/c))]
+   (-> priority-queue/c pq-pop-pair/c)]
+  [priority-queue-pop-value (-> priority-queue/c pq-pop-value/c)]
 
   ;; Conversion
-  [priority-queue->list (-> priority-queue/c (listof pair?))]
+  [priority-queue->list (-> priority-queue/c pair-list/c)]
   ) ; provide/contract

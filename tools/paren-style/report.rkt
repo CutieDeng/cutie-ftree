@@ -35,42 +35,73 @@
   (printf "config.list-exemptions?=~a\n" (checker-config-list-exemptions? cfg))
   (printf "config.enabled-rules=~a\n" (checker-config-enabled-rules cfg))
   (printf "config.disabled-rules=~a\n" (checker-config-disabled-rules cfg))
-  (printf "config.fail-path-rx-count=~a\n" (length (checker-config-fail-path-rx-list cfg)))
-  (printf "config.input-paths=~a\n" (string-join (checker-config-input-paths cfg) ", ")))
+  (define fail-path-rx-list
+    (checker-config-fail-path-rx-list cfg))
+  (printf "config.fail-path-rx-count=~a\n" (length fail-path-rx-list))
+  (define input-paths
+    (checker-config-input-paths cfg))
+  (define input-paths-str
+    (string-join input-paths ", "))
+  (printf "config.input-paths=~a\n" input-paths-str))
 
 (define (print-rules rules)
   (printf "rules.count=~a\n" (length rules))
   (for ([r (in-list rules)])
+    (define rid (rule-id r))
+    (define desc (rule-description r))
     (printf "~a: ~a\n"
-            (rule-id r)
-            (rule-description r))))
+            rid
+            desc)
+    ) ; for: rules
+  ) ; define print-rules
 
 (define (print-exemptions exemptions)
   (printf "exemptions.count=~a\n" (length exemptions))
   (for ([ex (in-list exemptions)])
+    (define ex-id (exemption-id ex))
+    (define ex-desc (exemption-description ex))
     (printf "~a: ~a\n"
-            (exemption-id ex)
-            (exemption-description ex))))
+            ex-id
+            ex-desc)
+    ) ; for: exemptions
+  ) ; define print-exemptions
 
 (define (print-violation v)
+  (define raw-line-text
+    (violation-line-text v))
+  (define v-text
+    (string-trim raw-line-text))
   (printf "~a:~a: run=~a rule=~a ~a\n"
           (path->string (violation-path v))
           (violation-line-number v)
           (violation-run-length v)
           (violation-rule-id v)
-          (string-trim (violation-line-text v))))
+          v-text)
+  ) ; define print-violation
 
 (define (print-report files violations cfg)
   (printf "Checked ~a files, found ~a style warnings.\n"
           (length files)
           (length violations))
+  (define limit
+    (checker-config-limit cfg))
   (cond
     [(checker-config-summary-only? cfg)
-     (for ([entry (in-list (take-limit (group-by-file violations)
-                                       (checker-config-limit cfg)))])
+     (define grouped (group-by-file violations))
+     (define limited-grouped
+       (take-limit grouped limit))
+     (for ([entry (in-list limited-grouped)])
        (define path (car entry))
        (define count (cdr entry))
-       (printf "~a: ~a warnings\n" path count))]
+       (printf "~a: ~a warnings\n" path count)
+       )
+     ] ; cond branch: summary-only
     [else
-     (for ([v (in-list (take-limit violations (checker-config-limit cfg)))])
-       (print-violation v))]))
+     (define limited-violations
+       (take-limit violations limit))
+     (for ([v (in-list limited-violations)])
+       (print-violation v)
+       )
+     ] ; cond branch: full report
+    ) ; cond
+  ) ; define print-report

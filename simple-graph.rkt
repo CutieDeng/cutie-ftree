@@ -26,10 +26,13 @@
 
 ;; Create an empty graph with n vertices
 (define (simple-graph-create n)
+  (define pv0 (pvector-empty))
+  (define n-seq (in-range n))
   (define adj
-    (for/fold ([pv (pvector-empty)])
-              ([_ (in-range n)])
-      (pvector-cons-right pv bitset-empty)))
+    (for/fold ([pv pv0])
+              ([_ n-seq])
+      (pvector-cons-right pv bitset-empty)
+      ))
   (simple-graph n adj))
 
 ;; ========================================
@@ -41,13 +44,17 @@
 (define (simple-graph-add-edge g v1 v2)
   (define adj (simple-graph-adjacency g))
   ;; Add v2 to v1's neighbors
+  (define v1-neighbors (pvector-ref adj v1))
+  (define v1-neighbors* (bitset-add v1-neighbors v2))
   (define adj1
     (pvector-set adj v1
-                 (bitset-add (pvector-ref adj v1) v2)))
+                 v1-neighbors*))
   ;; Add v1 to v2's neighbors
+  (define v2-neighbors (pvector-ref adj1 v2))
+  (define v2-neighbors* (bitset-add v2-neighbors v1))
   (define adj2
     (pvector-set adj1 v2
-                 (bitset-add (pvector-ref adj1 v2) v1)))
+                 v2-neighbors*))
   (simple-graph (simple-graph-size g) adj2))
 
 ;; ========================================
@@ -65,7 +72,8 @@
 
 ;; Get degree of v - O(log n)
 (define (simple-graph-degree g v)
-  (bitset-count (pvector-ref (simple-graph-adjacency g) v)))
+  (define neighbors (simple-graph-neighbors g v))
+  (bitset-count neighbors))
 
 ;; Get number of vertices
 (define (simple-graph-vertex-count g)
@@ -73,8 +81,10 @@
 
 ;; Get number of edges (each undirected edge counted once)
 (define (simple-graph-edge-count g)
+  (define n (simple-graph-size g))
+  (define i-seq (in-range n))
   (quotient
-   (for/sum ([i (in-range (simple-graph-size g))])
+   (for/sum ([i i-seq])
      (simple-graph-degree g i))
    2))
 
@@ -84,7 +94,8 @@
 
 ;; Iterate over neighbors of v (returns sequence of integers)
 (define (in-simple-graph-neighbors g v)
-  (in-bitset (simple-graph-neighbors g v)))
+  (define neighbors (simple-graph-neighbors g v))
+  (in-bitset neighbors))
 
 ;; ========================================
 ;; Exports

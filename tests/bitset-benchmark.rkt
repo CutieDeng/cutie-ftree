@@ -32,7 +32,9 @@
 (define (run-construction-benchmark size iterations)
   (printf "\n=== Construction Benchmark (size: ~a, iterations: ~a) ===\n" size iterations)
 
-  (define elements (for/list ([i (in-range size)]) i))
+  (define elements
+    (for/list ([i (in-range size)])
+      i))
 
   ;; bitset construction
   (define time-bitset
@@ -48,7 +50,9 @@
       iterations))
   (format-result "racket set (list->set)" time-set iterations)
 
-  (printf "  Speedup: ~ax\n" (real->decimal-string (/ time-set time-bitset) 2)))
+  (define speedup
+    (real->decimal-string (/ time-set time-bitset) 2))
+  (printf "  Speedup: ~ax\n" speedup))
 
 ;; ========================================
 ;; Membership Benchmark
@@ -58,16 +62,34 @@
   (printf "\n=== Membership Benchmark (size: ~a, queries: ~a, iterations: ~a) ===\n"
           size queries iterations)
 
-  (define bs (for/bitset ([i (in-range size)]) i))
-  (define rs (for/set ([i (in-range size)]) i))
-  (define query-indices (for/list ([_ (in-range queries)]) (random (* size 2))))
+  (define size-seq
+    (in-range size))
+  (define bs
+    (for/bitset ([i size-seq])
+      i))
+  (define size-seq-2
+    (in-range size))
+  (define rs
+    (for/set ([i size-seq-2])
+      i))
+  (define query-seq
+    (in-range queries))
+  (define query-upper
+    (* size 2))
+  (define query-indices
+    (for/list ([_ query-seq])
+      (define query
+        (random query-upper))
+      query
+      ))
 
   ;; bitset membership
   (define time-bitset
     (measure-time
       (lambda ()
         (for ([q query-indices])
-          (bitset-member? bs q)))
+          (void (bitset-member? bs q))
+          ))
       iterations))
   (format-result "bitset-member?" time-bitset iterations)
 
@@ -76,11 +98,14 @@
     (measure-time
       (lambda ()
         (for ([q query-indices])
-          (set-member? rs q)))
+          (void (set-member? rs q))
+          ))
       iterations))
   (format-result "set-member?" time-set iterations)
 
-  (printf "  Speedup: ~ax\n" (real->decimal-string (/ time-set time-bitset) 2)))
+  (define speedup
+    (real->decimal-string (/ time-set time-bitset) 2))
+  (printf "  Speedup: ~ax\n" speedup))
 
 ;; ========================================
 ;; Set Operations Benchmark
@@ -90,10 +115,30 @@
   (printf "\n=== Set Operations Benchmark (size: ~a, iterations: ~a) ===\n" size iterations)
 
   ;; Create two overlapping sets
-  (define bs1 (for/bitset ([i (in-range 0 size)]) i))
-  (define bs2 (for/bitset ([i (in-range (quotient size 2) (+ size (quotient size 2)))]) i))
-  (define rs1 (for/set ([i (in-range 0 size)]) i))
-  (define rs2 (for/set ([i (in-range (quotient size 2) (+ size (quotient size 2)))]) i))
+  (define bs1-seq
+    (in-range 0 size))
+  (define bs1
+    (for/bitset ([i bs1-seq])
+      i))
+  (define overlap-start
+    (quotient size 2))
+  (define overlap-end
+    (+ size overlap-start))
+  (define bs2-seq
+    (in-range overlap-start overlap-end))
+  (define bs2
+    (for/bitset ([i bs2-seq])
+      i))
+  (define rs1-seq
+    (in-range 0 size))
+  (define rs1
+    (for/set ([i rs1-seq])
+      i))
+  (define rs2-seq
+    (in-range overlap-start overlap-end))
+  (define rs2
+    (for/set ([i rs2-seq])
+      i))
 
   ;; Union
   (define time-bitset-union
@@ -123,7 +168,9 @@
   (define time-set-subtract
     (measure-time (lambda () (set-subtract rs1 rs2)) iterations))
   (format-result "set-subtract" time-set-subtract iterations)
-  (printf "  Subtract speedup: ~ax\n" (real->decimal-string (/ time-set-subtract time-bitset-subtract) 2)))
+  (define subtract-speedup
+    (real->decimal-string (/ time-set-subtract time-bitset-subtract) 2))
+  (printf "  Subtract speedup: ~ax\n" subtract-speedup))
 
 ;; ========================================
 ;; Iteration Benchmark
@@ -132,15 +179,27 @@
 (define (run-iteration-benchmark size iterations)
   (printf "\n=== Iteration Benchmark (size: ~a, iterations: ~a) ===\n" size iterations)
 
-  (define bs (for/bitset ([i (in-range size)]) i))
-  (define rs (for/set ([i (in-range size)]) i))
+  (define size-seq
+    (in-range size))
+  (define bs
+    (for/bitset ([i size-seq])
+      i))
+  (define size-seq-2
+    (in-range size))
+  (define rs
+    (for/set ([i size-seq-2])
+      i))
 
   ;; bitset iteration
   (define time-bitset
     (measure-time
       (lambda ()
-        (for/fold ([sum 0]) ([i (in-bitset bs)])
-          (+ sum i)))
+        (define iter-seq
+          (in-bitset bs))
+        (for/fold ([sum 0]) ([i iter-seq])
+          (define next-sum (+ sum i))
+          next-sum
+          ))
       iterations))
   (format-result "in-bitset" time-bitset iterations)
 
@@ -148,8 +207,12 @@
   (define time-bitset-rev
     (measure-time
       (lambda ()
-        (for/fold ([sum 0]) ([i (in-bitset/reverse bs)])
-          (+ sum i)))
+        (define iter-seq
+          (in-bitset/reverse bs))
+        (for/fold ([sum 0]) ([i iter-seq])
+          (define next-sum (+ sum i))
+          next-sum
+          ))
       iterations))
   (format-result "in-bitset/reverse" time-bitset-rev iterations)
 
@@ -157,12 +220,18 @@
   (define time-set
     (measure-time
       (lambda ()
-        (for/fold ([sum 0]) ([i (in-set rs)])
-          (+ sum i)))
+        (define iter-seq
+          (in-set rs))
+        (for/fold ([sum 0]) ([i iter-seq])
+          (define next-sum (+ sum i))
+          next-sum
+          ))
       iterations))
   (format-result "in-set" time-set iterations)
 
-  (printf "  Iteration speedup: ~ax\n" (real->decimal-string (/ time-set time-bitset) 2)))
+  (define speedup
+    (real->decimal-string (/ time-set time-bitset) 2))
+  (printf "  Iteration speedup: ~ax\n" speedup))
 
 ;; ========================================
 ;; Count Benchmark
@@ -171,8 +240,16 @@
 (define (run-count-benchmark size iterations)
   (printf "\n=== Count Benchmark (size: ~a, iterations: ~a) ===\n" size iterations)
 
-  (define bs (for/bitset ([i (in-range size)]) i))
-  (define rs (for/set ([i (in-range size)]) i))
+  (define size-seq
+    (in-range size))
+  (define bs
+    (for/bitset ([i size-seq])
+      i))
+  (define size-seq-2
+    (in-range size))
+  (define rs
+    (for/set ([i size-seq-2])
+      i))
 
   ;; bitset count
   (define time-bitset
@@ -184,7 +261,9 @@
     (measure-time (lambda () (set-count rs)) iterations))
   (format-result "set-count" time-set iterations)
 
-  (printf "  Speedup: ~ax\n" (real->decimal-string (/ time-set time-bitset) 2)))
+  (define speedup
+    (real->decimal-string (/ time-set time-bitset) 2))
+  (printf "  Speedup: ~ax\n" speedup))
 
 ;; ========================================
 ;; Add/Remove Benchmark
@@ -194,17 +273,43 @@
   (printf "\n=== Add/Remove Benchmark (size: ~a, ops: ~a, iterations: ~a) ===\n"
           size ops iterations)
 
-  (define bs (for/bitset ([i (in-range size)]) i))
-  (define rs (for/set ([i (in-range size)]) i))
-  (define add-indices (for/list ([_ (in-range ops)]) (+ size (random size))))
-  (define remove-indices (for/list ([_ (in-range ops)]) (random size)))
+  (define size-seq
+    (in-range size))
+  (define bs
+    (for/bitset ([i size-seq])
+      i))
+  (define size-seq-2
+    (in-range size))
+  (define rs
+    (for/set ([i size-seq-2])
+      i))
+  (define add-seq
+    (in-range ops))
+  (define add-indices
+    (for/list ([_ add-seq])
+      (define delta
+        (random size))
+      (define idx
+        (+ size delta))
+      idx
+      ))
+  (define remove-seq
+    (in-range ops))
+  (define remove-indices
+    (for/list ([_ remove-seq])
+      (define idx
+        (random size))
+      idx
+      ))
 
   ;; bitset add
   (define time-bitset-add
     (measure-time
       (lambda ()
         (for/fold ([s bs]) ([i add-indices])
-          (bitset-add s i)))
+          (define next-s (bitset-add s i))
+          next-s
+          ))
       iterations))
   (format-result "bitset-add" time-bitset-add iterations)
 
@@ -213,7 +318,9 @@
     (measure-time
       (lambda ()
         (for/fold ([s rs]) ([i add-indices])
-          (set-add s i)))
+          (define next-s (set-add s i))
+          next-s
+          ))
       iterations))
   (format-result "set-add" time-set-add iterations)
   (printf "  Add speedup: ~ax\n" (real->decimal-string (/ time-set-add time-bitset-add) 2))
@@ -223,7 +330,9 @@
     (measure-time
       (lambda ()
         (for/fold ([s bs]) ([i remove-indices])
-          (bitset-remove s i)))
+          (define next-s (bitset-remove s i))
+          next-s
+          ))
       iterations))
   (format-result "bitset-remove" time-bitset-remove iterations)
 
@@ -232,10 +341,14 @@
     (measure-time
       (lambda ()
         (for/fold ([s rs]) ([i remove-indices])
-          (set-remove s i)))
+          (define next-s (set-remove s i))
+          next-s
+          ))
       iterations))
   (format-result "set-remove" time-set-remove iterations)
-  (printf "  Remove speedup: ~ax\n" (real->decimal-string (/ time-set-remove time-bitset-remove) 2)))
+  (define remove-speedup
+    (real->decimal-string (/ time-set-remove time-bitset-remove) 2))
+  (printf "  Remove speedup: ~ax\n" remove-speedup))
 
 ;; ========================================
 ;; Subset/Disjoint Benchmark
@@ -244,10 +357,28 @@
 (define (run-predicate-benchmark size iterations)
   (printf "\n=== Predicate Benchmark (size: ~a, iterations: ~a) ===\n" size iterations)
 
-  (define bs1 (for/bitset ([i (in-range size)]) i))
-  (define bs2 (for/bitset ([i (in-range (quotient size 2))]) i))  ; subset of bs1
-  (define rs1 (for/set ([i (in-range size)]) i))
-  (define rs2 (for/set ([i (in-range (quotient size 2))]) i))
+  (define bs1-seq
+    (in-range size))
+  (define bs1
+    (for/bitset ([i bs1-seq])
+      i))
+  (define half-size
+    (quotient size 2))
+  (define bs2-seq
+    (in-range half-size))
+  (define bs2
+    (for/bitset ([i bs2-seq])
+      i))  ; subset of bs1
+  (define rs1-seq
+    (in-range size))
+  (define rs1
+    (for/set ([i rs1-seq])
+      i))
+  (define rs2-seq
+    (in-range half-size))
+  (define rs2
+    (for/set ([i rs2-seq])
+      i))
 
   ;; subset?
   (define time-bitset-subset
@@ -257,7 +388,9 @@
   (define time-set-subset
     (measure-time (lambda () (subset? rs2 rs1)) iterations))
   (format-result "subset?" time-set-subset iterations)
-  (printf "  Subset speedup: ~ax\n" (real->decimal-string (/ time-set-subset time-bitset-subset) 2)))
+  (define subset-speedup
+    (real->decimal-string (/ time-set-subset time-bitset-subset) 2))
+  (printf "  Subset speedup: ~ax\n" subset-speedup))
 
 ;; ========================================
 ;; Run All Benchmarks
@@ -271,8 +404,16 @@
 
 ;; Warmup
 (displayln "\nWarming up JIT...")
-(define warmup-bs (for/bitset ([i (in-range 100)]) i))
-(define warmup-rs (for/set ([i (in-range 100)]) i))
+(define warmup-seq
+  (in-range 100))
+(define warmup-bs
+  (for/bitset ([i warmup-seq])
+    i))
+(define warmup-seq-2
+  (in-range 100))
+(define warmup-rs
+  (for/set ([i warmup-seq-2])
+    i))
 (for ([_ (in-range 1000)])
   (bitset-member? warmup-bs (random 100))
   (set-member? warmup-rs (random 100))

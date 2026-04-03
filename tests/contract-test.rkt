@@ -7,6 +7,26 @@
 (require "../ordered-map/safe.rkt")
 (require "../comparator.rkt")
 
+(define (mk-pv xs)
+  (list->pvector xs))
+
+(define (mk-om n make-value)
+  (define i-seq
+    (in-range n))
+  (for/ordered-map integer-compare ([i i-seq])
+    (cons i (make-value i))
+    ))
+
+(define (mk-om/kv n make-key make-value)
+  (define i-seq
+    (in-range n))
+  (for/ordered-map integer-compare ([i i-seq])
+    (cons (make-key i) (make-value i))
+    ))
+
+(define (fmt-v i)
+  (format "v~a" i))
+
 ;; ========================================
 ;; Contract Attachment Demonstration
 ;; ========================================
@@ -30,25 +50,42 @@
 (test-case "pvectorof: first-order check"
   ;; First-order check happens immediately
   (check-true (contract-first-order-passes? (pvectorof integer?)
-                (list->pvector '(1 2 3))))
+                (mk-pv '(1 2 3))))
   (check-false (contract-first-order-passes? (pvectorof integer?)
-                 (list->pvector '(1 "two" 3))))
-  (check-false (contract-first-order-passes? (pvectorof integer?)
-                 "not a pvector")))
+                 (mk-pv '(1 "two" 3))))
+  (define not-a-pvector
+    "not a pvector")
+  (define not-pv-pass?
+    (contract-first-order-passes? (pvectorof integer?) not-a-pvector))
+  (check-false not-pv-pass?))
 
 (test-case "pvectorof: boundary check"
   ;; Contract checked when crossing define/contract boundary
   (check-not-exn
     (lambda ()
-      (contract (pvectorof integer?) (list->pvector '(1 2 3)) 'pos 'neg)))
+      (define ctc (pvectorof integer?))
+      (define src '(1 2 3))
+      (define val (mk-pv src))
+      (define pos 'pos)
+      (define neg 'neg)
+      (contract ctc val pos neg)
+      ))
 
   (check-exn exn:fail:contract?
     (lambda ()
-      (contract (pvectorof integer?) (list->pvector '(1 "bad" 3)) 'pos 'neg))))
+      (define ctc (pvectorof integer?))
+      (define src '(1 "bad" 3))
+      (define val (mk-pv src))
+      (define pos 'pos)
+      (define neg 'neg)
+      (contract ctc val pos neg)
+      )
+    )
+  )
 
 (test-case "pvectorof: wrapper preserves contract"
   (define/contract pv (pvectorof integer?)
-    (list->pvector '(1 2 3)))
+    (mk-pv '(1 2 3)))
 
   ;; The wrapper type is created
   (check-true (contracted-pvector? pv))
@@ -63,7 +100,7 @@
 
 (test-case "pvectorof: input vs output blame"
   (define/contract pv (pvectorof integer?)
-    (list->pvector '(1 2 3)))
+    (mk-pv '(1 2 3)))
 
   ;; Output check: ref returns checked value
   (check-equal? (pvector-ref* pv 0) 1)
@@ -82,46 +119,67 @@
 
 (test-case "pvectorof: iteration with contract"
   (define/contract pv (pvectorof integer?)
-    (list->pvector '(1 2 3)))
+    (mk-pv '(1 2 3)))
 
   ;; Iteration uses prop:sequence, elements are checked
-  (check-equal? (for/list ([v pv]) v) '(1 2 3)))
+  (define items
+    (for/list ([v pv]) v))
+  (define expected-items
+    '(1 2 3))
+  (check-equal? items expected-items))
 
 (test-case "pvectorof: pop returns checked values"
   (define/contract pv (pvectorof integer?)
-    (list->pvector '(1 2 3)))
+    (mk-pv '(1 2 3)))
 
   (define-values (elem rest) (pvector-pop-left* pv))
   (check-equal? elem 1)
-  (check-true (contracted-pvector? rest)))
+  (define rest-contracted?
+    (contracted-pvector? rest))
+  (check-true rest-contracted?))
 
 ;; ========================================
 ;; Test: ordered-mapof contracts
 ;; ========================================
 
 (test-case "ordered-mapof: first-order check"
-  (define om (for/ordered-map integer-compare ([i 3]) (cons i (number->string i))))
+  (define om
+    (mk-om 3 number->string))
 
   (check-true (contract-first-order-passes? (ordered-mapof integer? string?) om))
   (check-false (contract-first-order-passes? (ordered-mapof integer? integer?) om))
-  (check-false (contract-first-order-passes? (ordered-mapof string? string?) om)))
+  (define wrong-key-contract?
+    (contract-first-order-passes? (ordered-mapof string? string?) om))
+  (check-false wrong-key-contract?))
 
 (test-case "ordered-mapof: boundary check"
   (check-not-exn
     (lambda ()
-      (contract (ordered-mapof integer? string?)
-        (for/ordered-map integer-compare ([i 3]) (cons i (format "~a" i)))
-        'pos 'neg)))
+      (define ctc
+        (ordered-mapof integer? string?))
+      (define val
+        (mk-om 3 (lambda (i) (format "~a" i))))
+      (define pos 'pos)
+      (define neg 'neg)
+      (contract ctc val pos neg)
+      ))
 
   (check-exn exn:fail:contract?
     (lambda ()
-      (contract (ordered-mapof integer? string?)
-        (for/ordered-map integer-compare ([i 3]) (cons i i)) ;; value is int, not string
-        'pos 'neg))))
+      (define ctc
+        (ordered-mapof integer? string?))
+      (define val
+        (mk-om 3 (lambda (i) i))) ;; value is int, not string
+      (define pos 'pos)
+      (define neg 'neg)
+      (contract ctc val pos neg)
+      )
+    )
+  )
 
 (test-case "ordered-mapof: wrapper preserves contract"
   (define/contract om (ordered-mapof integer? string?)
-    (for/ordered-map integer-compare ([i 3]) (cons i (format "v~a" i))))
+    (mk-om 3 (lambda (i) (format "v~a" i))))
 
   (check-true (contracted-ordered-map? om))
 
@@ -150,7 +208,7 @@
 
 (test-case "ordered-mapof: query returns checked values"
   (define/contract om (ordered-mapof integer? string?)
-    (for/ordered-map integer-compare ([i 3]) (cons i (format "v~a" i))))
+    (mk-om 3 (lambda (i) (format "v~a" i))))
 
   ;; ref returns string (checked)
   (check-equal? (ordered-map-ref* om 1) "v1")
@@ -161,16 +219,26 @@
 
   ;; min/max return checked pairs
   (check-equal? (ordered-map-min* om) '(0 . "v0"))
-  (check-equal? (ordered-map-max* om) '(2 . "v2")))
+  (define max-kv
+    (ordered-map-max* om))
+  (define expected-max
+    '(2 . "v2"))
+  (check-equal? max-kv expected-max))
 
 (test-case "ordered-mapof: iteration with contract"
   (define/contract om (ordered-mapof integer? string?)
-    (for/ordered-map integer-compare ([i 3]) (cons i (format "v~a" i))))
+    (mk-om 3 (lambda (i) (format "v~a" i))))
 
   ;; Iteration checks each key-value pair
+  (define expected-kvs
+    (list
+      '(0 . "v0")
+      '(1 . "v1")
+      '(2 . "v2")
+      ))
   (check-equal?
     (for/list ([kv om]) kv)
-    '((0 . "v0") (1 . "v1") (2 . "v2"))))
+    expected-kvs))
 
 ;; ========================================
 ;; Test: Contract behavior comparison
@@ -178,12 +246,15 @@
 
 (test-case "compare: unwrapped vs wrapped operations"
   ;; Without contract wrapper - no runtime checks
-  (define pv-raw (list->pvector '(1 2 3)))
+  (define raw-src
+    '(1 2 3))
+  (define pv-raw
+    (mk-pv raw-src))
   (check-false (contracted-pvector? pv-raw))
 
   ;; With contract wrapper - runtime checks on *-operations
   (define/contract pv-wrapped (pvectorof integer?)
-    (list->pvector '(1 2 3)))
+    (mk-pv '(1 2 3)))
   (check-true (contracted-pvector? pv-wrapped))
 
   ;; Raw pvector allows anything (no contract)
@@ -199,14 +270,18 @@
     (-> (pvectorof integer?) integer?)
     ;; pv is now a contracted-pvector, iterate directly (uses prop:sequence)
     (for/fold ([sum 0]) ([v pv])
-      (+ sum v)))
+      (define next-sum (+ sum v))
+      next-sum
+      ))
 
   ;; Valid call
-  (check-equal? (process-ints (list->pvector '(1 2 3))) 6)
+  (define good-pv
+    (mk-pv '(1 2 3)))
+  (check-equal? (process-ints good-pv) 6)
 
   ;; Invalid call - contract checked at call boundary
   (check-exn exn:fail:contract?
-    (lambda () (process-ints (list->pvector '(1 "two" 3))))))
+    (lambda () (process-ints (mk-pv '(1 "two" 3))))))
 
 ;; ========================================
 ;; Test: Nested contracts
@@ -214,7 +289,7 @@
 
 (test-case "nested: pvectorof with complex element contract"
   (define/contract pv (pvectorof (cons/c integer? string?))
-    (list->pvector (list (cons 1 "a") (cons 2 "b"))))
+    (mk-pv (list (cons 1 "a") (cons 2 "b"))))
 
   (check-true (contracted-pvector? pv))
   (check-equal? (pvector-ref* pv 0) '(1 . "a"))
@@ -238,7 +313,9 @@
 (test-case "ordered-mapof: rank with contract (positive)"
   ;; 正例：rank 查询返回正确的排名
   (define/contract om (ordered-mapof integer? string?)
-    (for/ordered-map integer-compare ([i 5]) (cons (* i 10) (format "v~a" i))))
+    (mk-om/kv 5
+      (lambda (i) (* i 10))
+      fmt-v))
   ;; om contains: {0->"v0", 10->"v1", 20->"v2", 30->"v3", 40->"v4"}
 
   (check-equal? (ordered-map-rank* om 0) 0)   ; 第 0 小
@@ -249,7 +326,7 @@
 (test-case "ordered-mapof: rank with invalid key type (negative)"
   ;; 反例：用错误类型的 key 查询 rank 应该触发 contract 错误
   (define/contract om (ordered-mapof integer? string?)
-    (for/ordered-map integer-compare ([i 3]) (cons i (format "v~a" i))))
+    (mk-om 3 fmt-v))
 
   ;; 用字符串查询整数键的 map - 应该被 contract 拒绝
   (check-exn exn:fail:contract?
@@ -258,7 +335,9 @@
 (test-case "ordered-mapof: select with contract (positive)"
   ;; 正例：select 按排名查询返回正确的键值对
   (define/contract om (ordered-mapof integer? string?)
-    (for/ordered-map integer-compare ([i 5]) (cons (* i 10) (format "v~a" i))))
+    (mk-om/kv 5
+      (lambda (i) (* i 10))
+      fmt-v))
 
   (check-equal? (ordered-map-select* om 0) '(0 . "v0"))
   (check-equal? (ordered-map-select* om 2) '(20 . "v2"))
@@ -269,7 +348,9 @@
 (test-case "ordered-mapof: count-less-than with contract (positive)"
   ;; 正例：count-less-than 返回小于给定 key 的元素数量
   (define/contract om (ordered-mapof integer? string?)
-    (for/ordered-map integer-compare ([i 5]) (cons (* i 10) (format "v~a" i))))
+    (mk-om/kv 5
+      (lambda (i) (* i 10))
+      fmt-v))
   ;; om contains: {0, 10, 20, 30, 40}
 
   (check-equal? (ordered-map-count-less-than* om 0) 0)   ; 没有比 0 小的
@@ -280,7 +361,7 @@
 (test-case "ordered-mapof: count-less-than with invalid key type (negative)"
   ;; 反例：用错误类型的 key 应该触发 contract 错误
   (define/contract om (ordered-mapof integer? string?)
-    (for/ordered-map integer-compare ([i 3]) (cons i "v")))
+    (mk-om 3 (lambda (_) "v")))
 
   (check-exn exn:fail:contract?
     (lambda () (ordered-map-count-less-than* om "bad-key"))))
@@ -294,28 +375,42 @@
   ;; 场景：define/contract 时提供了不符合 contract 的值
   (check-exn
     (lambda (e)
+      (define msg (exn-message e))
+      (define has-element?
+        (regexp-match? #rx"element" msg))
       (and (exn:fail:contract:blame? e)
            ;; 错误消息应该包含违规位置信息
-           (regexp-match? #rx"element" (exn-message e))))
+           has-element?))
     (lambda ()
       ;; 提供包含字符串的 pvector 给 (pvectorof integer?) contract
       (define/contract pv (pvectorof integer?)
-        (list->pvector '(1 "bad" 3)))
-      pv)))
+        (mk-pv '(1 "bad" 3)))
+      pv
+      )
+    ))
 
 (test-case "blame: negative position (consumer violated)"
   ;; 当消费者违反 contract 时，blame 指向 negative position
   ;; 场景：调用 *-operation 时传入不符合 contract 的参数
   (define/contract pv (pvectorof integer?)
-    (list->pvector '(1 2 3)))
+    (mk-pv '(1 2 3)))
 
   (check-exn
     (lambda (e)
+      (define msg (exn-message e))
+      (define has-element?
+        (regexp-match? #rx"element" msg))
       (and (exn:fail:contract:blame? e)
-           (regexp-match? #rx"element" (exn-message e))))
+           has-element?))
     (lambda ()
       ;; 消费者尝试插入字符串到整数 pvector
-      (pvector-cons-right* pv "consumer-violation"))))
+      (define bad-val "consumer-violation")
+      (define result
+        (pvector-cons-right* pv bad-val))
+      result
+      )
+    )
+  )
 
 (test-case "blame: ordered-map key vs value distinction"
   ;; 验证 ordered-map 的 blame 能区分 key 和 value 违规
@@ -325,18 +420,34 @@
   ;; key 违规 - 错误消息应包含 "key"
   (check-exn
     (lambda (e)
+      (define msg (exn-message e))
+      (define has-key?
+        (regexp-match? #rx"key" msg))
       (and (exn:fail:contract:blame? e)
-           (regexp-match? #rx"key" (exn-message e))))
+           has-key?))
     (lambda ()
-      (ordered-map-set* om 123 456))) ; 123 不是 symbol
+      (define bad-key 123)
+      (define result
+        (ordered-map-set* om bad-key 456))
+      result
+      )) ; 123 不是 symbol
 
   ;; value 违规 - 错误消息应包含 "value"
   (check-exn
     (lambda (e)
+      (define msg (exn-message e))
+      (define has-value?
+        (regexp-match? #rx"value" msg))
       (and (exn:fail:contract:blame? e)
-           (regexp-match? #rx"value" (exn-message e))))
+           has-value?))
     (lambda ()
-      (ordered-map-set* om 'key "not-an-integer")))) ; "not-an-integer" 不是 integer
+      (define bad-val "not-an-integer")
+      (define result
+        (ordered-map-set* om 'key bad-val))
+      result
+      )
+    )
+  ) ; "not-an-integer" 不是 integer
 
 ;; ========================================
 ;; Test: Edge Cases and Boundary Conditions
@@ -357,7 +468,7 @@
 (test-case "edge: single element containers"
   ;; 单元素容器的 contract 检查
   (define/contract single-pv (pvectorof positive?)
-    (list->pvector '(42)))
+    (mk-pv '(42)))
   (check-equal? (pvector-ref* single-pv 0) 42)
   (check-equal? (pvector-length* single-pv) 1)
 
@@ -370,7 +481,7 @@
 (test-case "edge: contract with any/c"
   ;; any/c 允许任何值
   (define/contract pv (pvectorof any/c)
-    (list->pvector '(1 "two" #t (a b c))))
+    (mk-pv '(1 "two" #t (a b c))))
 
   (check-equal? (pvector-ref* pv 0) 1)
   (check-equal? (pvector-ref* pv 1) "two")
@@ -385,7 +496,7 @@
 (test-case "edge: contract with or/c"
   ;; or/c 允许多种类型
   (define/contract pv (pvectorof (or/c integer? string? symbol?))
-    (list->pvector '(1 "two" three)))
+    (mk-pv '(1 "two" three)))
 
   (check-equal? (for/list ([v pv]) v) '(1 "two" three))
 
@@ -407,7 +518,7 @@
 (test-case "propagation: operations preserve contract"
   ;; 验证各种操作后 contract 仍然有效
   (define/contract pv0 (pvectorof integer?)
-    (list->pvector '(1 2 3)))
+    (mk-pv '(1 2 3)))
 
   ;; cons-right 返回的值仍有 contract
   (define pv1 (pvector-cons-right* pv0 4))
@@ -475,10 +586,13 @@
 (test-case "usage: type-safe priority queue elements"
   ;; 场景：优先队列元素必须是 (priority . task-name) 的格式
   (define/contract tasks (pvectorof (cons/c integer? string?))
-    (list->pvector (list (cons 1 "urgent") (cons 5 "low") (cons 3 "normal"))))
+    (mk-pv (list (cons 1 "urgent") (cons 5 "low") (cons 3 "normal"))))
 
   ;; 添加新任务
-  (define tasks2 (pvector-cons-right* tasks (cons 2 "important")))
+  (define new-task
+    (cons 2 "important"))
+  (define tasks2
+    (pvector-cons-right* tasks new-task))
   (check-equal? (pvector-length* tasks2) 4)
 
   ;; 防止格式错误的任务
@@ -493,25 +607,32 @@
   ;; 这个函数期望一个整数 pvector，返回它们的和
   (define/contract (sum-integers pv)
     (-> (pvectorof integer?) integer?)
-    (for/fold ([sum 0]) ([v pv]) (+ sum v)))
+    (for/fold ([sum 0]) ([v pv])
+      (define next-sum (+ sum v))
+      next-sum
+      ))
 
   ;; 正确使用
-  (check-equal? (sum-integers (list->pvector '(1 2 3 4 5))) 15)
+  (define good-pv
+    (mk-pv '(1 2 3 4 5)))
+  (check-equal? (sum-integers good-pv) 15)
 
   ;; 错误使用 - contract 提供清晰的错误信息
   (check-exn exn:fail:contract?
-    (lambda () (sum-integers (list->pvector '(1 2 "three")))))
+    (lambda () (sum-integers (mk-pv '(1 2 "three")))))
 
   ;; 这个函数期望一个 integer->string 的 ordered-map
   (define/contract (format-map om)
     (-> (ordered-mapof integer? string?) string?)
     (string-join
       (for/list ([kv om])
-        (format "~a: ~a" (car kv) (cdr kv)))
+        (define k (car kv))
+        (define v (cdr kv))
+        (format "~a: ~a" k v))
       ", "))
 
   (define test-map
-    (for/ordered-map integer-compare ([i 3]) (cons i (format "item~a" i))))
+    (mk-om 3 (lambda (i) (format "item~a" i))))
   (check-equal? (format-map test-map) "0: item0, 1: item1, 2: item2"))
 
 ;; ========================================

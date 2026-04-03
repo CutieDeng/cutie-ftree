@@ -20,18 +20,25 @@
   (define path-rx (if (>= (length spec) 5) (list-ref spec 4) #f))
   (define semantic-kind (if (>= (length spec) 6) (list-ref spec 5) #f))
   (define ast-tag (if (>= (length spec) 7) (list-ref spec 6) #f))
-  (exemption
-   id
-   description
-   (lambda (ctx cfg)
-     (and (= (line-context-run-length ctx) exact-run)
-          (or (not semantic-kind)
-              (eq? semantic-kind (line-context-semantic-kind ctx)))
-          (or (not ast-tag)
-              (set-member? (line-context-semantic-tags ctx) ast-tag))
-          (regexp-match? line-rx (line-context-code-prefix ctx))
-          (or (not path-rx)
-              (regexp-match? path-rx (path->string (line-context-path ctx))))))))
+  (define (pred ctx cfg)
+    (define ctx-kind (line-context-semantic-kind ctx))
+    (define ctx-tags (line-context-semantic-tags ctx))
+    (define code-prefix (line-context-code-prefix ctx))
+    (define ctx-path (line-context-path ctx))
+    (define ctx-path-str (path->string ctx-path))
+    (define ok?
+      (and (= (line-context-run-length ctx) exact-run)
+           (or (not semantic-kind)
+               (eq? semantic-kind ctx-kind))
+           (or (not ast-tag)
+               (set-member? ctx-tags ast-tag))
+           (regexp-match? line-rx code-prefix)
+           (or (not path-rx)
+               (regexp-match? path-rx ctx-path-str))
+           ))
+    ok?)
+  (exemption id description pred)
+  ) ; define spec->exemption
 
 (define built-in-exemptions
   (map spec->exemption built-in-exemption-specs))
@@ -42,6 +49,8 @@
     ex))
 
 (define (exemption->summary ex)
+  (define id (exemption-id ex))
+  (define description (exemption-description ex))
   (format "~a: ~a"
-          (exemption-id ex)
-          (exemption-description ex)))
+          id
+          description))

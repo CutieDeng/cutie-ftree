@@ -29,7 +29,8 @@
   (define pq (priority-queue-insert (priority-queue-empty integer-compare) 5 "five"))
   (define-values (pq2 elem) (priority-queue-pop pq))
   (check-equal? elem (cons 5 "five"))
-  (check-true (priority-queue-empty? pq2)))
+  (define pq2-empty? (priority-queue-empty? pq2))
+  (check-true pq2-empty?))
 
 (test-case "multiple elements - min extraction"
   (define pq (priority-queue-empty integer-compare))
@@ -54,10 +55,17 @@
   (define-values (r4 e4) (priority-queue-pop r3))
   (check-equal? e4 (cons 7 "seven"))
 
-  (check-true (priority-queue-empty? r4)))
+  (define r4-empty? (priority-queue-empty? r4))
+  (check-true r4-empty?))
 
 (test-case "list->priority-queue and priority-queue->list"
-  (define lst '((3 . "three") (1 . "one") (4 . "four") (1 . "one-again") (5 . "five")))
+  (define five-pair (cons 5 "five"))
+  (define lst
+    (list (cons 3 "three")
+          (cons 1 "one")
+          (cons 4 "four")
+          (cons 1 "one-again")
+          five-pair))
   (define pq (list->priority-queue integer-compare lst))
   (check-equal? (priority-queue-count pq) 5)
 
@@ -87,7 +95,8 @@
   (check-equal? (car e1) 5)
   (check-equal? (car e2) 5)
   (check-equal? (car e3) 5)
-  (check-true (priority-queue-empty? r3)))
+  (define r3-empty? (priority-queue-empty? r3))
+  (check-true r3-empty?))
 
 (test-case "large queue"
   (define n 100)
@@ -101,9 +110,20 @@
   (check-equal? (length sorted) n)
 
   ;; Verify priorities are non-decreasing
-  (for ([i (in-range (sub1 n))])
-    (check-true (<= (car (list-ref sorted i))
-                    (car (list-ref sorted (add1 i)))))))
+  (define n-1 (sub1 n))
+  (define i-seq (in-range n-1))
+  (for ([i i-seq])
+    (define ith (list-ref sorted i))
+    (define i+1 (add1 i))
+    (define idx2 i+1)
+    (define ith+1 (list-ref sorted idx2))
+    (define a (car ith))
+    (define b (car ith+1))
+    (define non-decreasing? (<= a b))
+    (check-true non-decreasing?)
+    )
+  (define n-1-again n-1)
+  (check-equal? n-1 n-1-again))
 
 (test-case "immutability"
   (define pq1 (priority-queue-empty integer-compare))
@@ -117,15 +137,19 @@
   (check-equal? (priority-queue-peek pq2) (cons 5 "five"))
   ;; pq3 should have one element with priority 3
   (check-equal? (priority-queue-count pq3) 1)
-  (check-equal? (priority-queue-peek pq3) (cons 3 "three")))
+  (define pq3-peek (priority-queue-peek pq3))
+  (define p3 (cons 3 "three"))
+  (check-equal? pq3-peek p3))
 
 (test-case "max-heap via reversed comparator"
   ;; Create a max-heap by reversing the comparator
   (define (reverse-compare x y)
-    (match (integer-compare x y)
-      ['< '>]
-      ['> '<]
-      ['= '=]))
+    (define cmp (integer-compare x y))
+    (cond
+      [(eq? cmp '<) '>]
+      [(eq? cmp '>) '<]
+      [else '=]
+      ))
 
   (define pq (priority-queue-empty reverse-compare))
   (define pq2 (priority-queue-insert pq 1 "one"))
@@ -142,6 +166,7 @@
   (check-equal? e2 (cons 3 "three"))
 
   (define-values (r3 e3) (priority-queue-pop r2))
-  (check-equal? e3 (cons 1 "one")))
+  (define expected (cons 1 "one"))
+  (check-equal? e3 expected))
 
 (printf "All priority queue tests passed!\n")

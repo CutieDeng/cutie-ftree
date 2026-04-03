@@ -36,7 +36,10 @@
      [("--max-run")
       n
       "Report lines with this many consecutive closing parens/brackets before comments"
-      (set! max-run (parse-int n "--max-run"))]
+      (define parsed-max-run
+        (parse-int n "--max-run"))
+      (set! max-run parsed-max-run)
+      ]
      [("--fail-on-violation")
       "Exit non-zero if any violation is found"
       (set! fail-on-violation? #t)]
@@ -46,7 +49,10 @@
      [("--limit")
       n
       "Limit printed rows in either detailed or summary mode"
-      (set! limit (parse-int n "--limit"))]
+      (define parsed-limit
+        (parse-int n "--limit"))
+      (set! limit parsed-limit)
+      ]
      [("--baseline")
       path
       "Ignore violations already listed in the baseline file"
@@ -67,19 +73,32 @@
      [("--enable-rule")
       rule-id
       "Enable only these rule ids (repeatable). Example: --enable-rule dense-closing-run"
-      (set! enabled-rules (cons (string->symbol rule-id) enabled-rules))]
+      (define rule-sym (string->symbol rule-id))
+      (set! enabled-rules (cons rule-sym enabled-rules))
+      ]
      [("--disable-rule")
       rule-id
       "Disable specific rule ids (repeatable)."
-      (set! disabled-rules (cons (string->symbol rule-id) disabled-rules))]
+      (define rule-sym (string->symbol rule-id))
+      (set! disabled-rules (cons rule-sym disabled-rules))
+      ]
      [("--fail-path-rx")
       rx
       "Only fail on violations whose file path matches this regexp (repeatable)."
-      (set! fail-path-rx-list (cons (regexp rx) fail-path-rx-list))]
+      (define rx^ (regexp rx))
+      (set! fail-path-rx-list (cons rx^ fail-path-rx-list))
+      ]
      #:args paths
      (unless (null? paths)
-       (set! input-paths paths))))
+       (set! input-paths paths))
+     ))
 
+  (define enabled-rules^
+    (reverse enabled-rules))
+  (define disabled-rules^
+    (reverse disabled-rules))
+  (define fail-path-rx-list^
+    (reverse fail-path-rx-list))
   (checker-config max-run
                   fail-on-violation?
                   summary-only?
@@ -90,6 +109,6 @@
                   show-config?
                   list-exemptions?
                   list-rules?
-                  (reverse enabled-rules)
-                  (reverse disabled-rules)
-                  (reverse fail-path-rx-list)))
+                  enabled-rules^
+                  disabled-rules^
+                  fail-path-rx-list^))

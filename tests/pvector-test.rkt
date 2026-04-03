@@ -3,83 +3,107 @@
 (require rackunit racket/list racket/match racket/random)
 (require "../pvector.rkt")
 
+(define (sum-pvector-elements l)
+  (define len
+    (pvector-length l))
+  (define i-seq
+    (in-range len))
+  (for/fold ([sum 0]) ([i i-seq])
+    (define v
+      (pvector-ref l i))
+    (+ sum v)
+    ))
+
+(define (repeat-insert pv idx n)
+  (define i-seq
+    (in-range n))
+  (for/fold ([out pv]) ([i i-seq])
+    (pvector-insert out idx i)
+    ))
+
 ;; ========================================
 ;; Basic cons-right tests
 ;; ========================================
 
 (test-case "pvector-cons-right adds elements correctly"
-  (let ([l (pvector-empty)])
-    (set! l (pvector-cons-right l 1))
-    (set! l (pvector-cons-right l 1))
-    (set! l (pvector-cons-right l 1))
-    (set! l (pvector-cons-right l 1))
-    (set! l (pvector-cons-right l 1))
-    (set! l (pvector-cons-right l 1))
-    (set! l (pvector-cons-right l 1))
-    (define sum-v (for/fold ([sum 0]) ([i (in-range (pvector-length l))])
-      (define v (pvector-ref l i))
-      (+ sum v)))
-    (check-equal? 7 sum-v)))
+  (define l0
+    (pvector-empty))
+  (define l1 (pvector-cons-right l0 1))
+  (define l2 (pvector-cons-right l1 1))
+  (define l3 (pvector-cons-right l2 1))
+  (define l4 (pvector-cons-right l3 1))
+  (define l5 (pvector-cons-right l4 1))
+  (define l6 (pvector-cons-right l5 1))
+  (define l7 (pvector-cons-right l6 1))
+  (define sum-v
+    (sum-pvector-elements l7))
+  (check-equal? 7 sum-v))
 
 ;; ========================================
 ;; Basic cons-left tests
 ;; ========================================
 
 (test-case "pvector-cons-left adds elements correctly"
-  (let ([l (pvector-empty)])
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (define sum-v (for/fold ([sum 0]) ([i (in-range (pvector-length l))])
-      (define v (pvector-ref l i))
-      (+ sum v)))
-    (check-equal? 7 sum-v)))
+  (define l0
+    (pvector-empty))
+  (define l1 (pvector-cons-left l0 1))
+  (define l2 (pvector-cons-left l1 1))
+  (define l3 (pvector-cons-left l2 1))
+  (define l4 (pvector-cons-left l3 1))
+  (define l5 (pvector-cons-left l4 1))
+  (define l6 (pvector-cons-left l5 1))
+  (define l7 (pvector-cons-left l6 1))
+  (define sum-v
+    (sum-pvector-elements l7))
+  (check-equal? 7 sum-v))
 
 ;; ========================================
 ;; Split-at tests
 ;; ========================================
 
 (test-case "pvector-split-at works correctly"
-  (let ([l (pvector-empty)])
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (set! l (pvector-cons-left l 1))
-    (define-values (l1 l2) (pvector-split-at l 4))
-    (define sum-v1 (for/fold ([sum 0]) ([i (in-range (pvector-length l1))])
-      (define v (pvector-ref l1 i))
-      (+ sum v)))
-    (define sum-v2 (for/fold ([sum 0]) ([i (in-range (pvector-length l2))])
-      (define v (pvector-ref l2 i))
-      (+ sum v)))
-    (check-equal? 4 sum-v1)
-    (check-equal? 3 sum-v2)))
+  (define l0
+    (pvector-empty))
+  (define l1 (pvector-cons-left l0 1))
+  (define l2 (pvector-cons-left l1 1))
+  (define l3 (pvector-cons-left l2 1))
+  (define l4 (pvector-cons-left l3 1))
+  (define l5 (pvector-cons-left l4 1))
+  (define l6 (pvector-cons-left l5 1))
+  (define l7 (pvector-cons-left l6 1))
+  (define-values (left right)
+    (pvector-split-at l7 4))
+  (define sum-v1
+    (sum-pvector-elements left))
+  (define sum-v2
+    (sum-pvector-elements right))
+  (check-equal? 4 sum-v1)
+  (check-equal? 3 sum-v2))
 
 ;; ========================================
 ;; Insert tests
 ;; ========================================
 
 (test-case "pvector-insert at position 0"
-  (let ([f (pvector-empty)])
-    (set! f (for/fold ([f f]) ([i (in-range 10)]) (pvector-insert f 0 i)))
-    (check-equal? (pvector-length f) 10)))
+  (define f0
+    (pvector-empty))
+  (define f
+    (repeat-insert f0 0 10))
+  (check-equal? (pvector-length f) 10))
 
 (test-case "pvector-insert at position 1"
-  (let ([f (pvector-cons-left (pvector-empty) 5)])
-    (set! f (for/fold ([f f]) ([i (in-range 10)]) (pvector-insert f 1 i)))
-    (check-equal? (pvector-length f) 11)))
+  (define f0
+    (pvector-cons-left (pvector-empty) 5))
+  (define f
+    (repeat-insert f0 1 10))
+  (check-equal? (pvector-length f) 11))
 
 (test-case "pvector-insert large scale"
-  (let ([f (pvector-cons-left (pvector-empty) 5)])
-    (set! f (for/fold ([f f]) ([i (in-range 20)]) (pvector-insert f 1 i)))
-    (check-equal? (pvector-length f) 21)))
+  (define f0
+    (pvector-cons-left (pvector-empty) 5))
+  (define f
+    (repeat-insert f0 1 20))
+  (check-equal? (pvector-length f) 21))
 
 ;; ========================================
 ;; Additional tests
@@ -90,7 +114,10 @@
   (check-equal? (pvector-length (pvector-empty)) 0))
 
 (test-case "pvector-ref and pvector-set work correctly"
-  (define pv (list->pvector '(0 1 2 3 4)))
+  (define src
+    '(0 1 2 3 4))
+  (define pv
+    (list->pvector src))
   (check-equal? (pvector-ref pv 2) 2)
   (define pv2 (pvector-set pv 2 42))
   (check-equal? (pvector-ref pv2 2) 42)
@@ -98,17 +125,34 @@
   (check-equal? (pvector-ref pv 2) 2))
 
 (test-case "pvector-split works correctly"
-  (define pv (list->pvector '(0 1 2 3 4 5 6)))
+  (define src
+    '(0 1 2 3 4 5 6))
+  (define pv
+    (list->pvector src))
   (define-values (left mid right) (pvector-split pv 3))
   (check-equal? (pvector->list left) '(0 1 2))
   (check-equal? mid 3)
-  (check-equal? (pvector->list right) '(4 5 6)))
+  (define right-list
+    (pvector->list right))
+  (define expected-right
+    '(4 5 6))
+  (check-equal? right-list expected-right))
 
 (test-case "pvector-append works correctly"
-  (define pv1 (list->pvector '(1 2 3)))
-  (define pv2 (list->pvector '(4 5 6)))
+  (define left-src
+    '(1 2 3))
+  (define right-src
+    '(4 5 6))
+  (define pv1
+    (list->pvector left-src))
+  (define pv2
+    (list->pvector right-src))
   (define pv3 (pvector-append pv1 pv2))
-  (check-equal? (pvector->list pv3) '(1 2 3 4 5 6)))
+  (define pv3-list
+    (pvector->list pv3))
+  (define expected
+    '(1 2 3 4 5 6))
+  (check-equal? pv3-list expected))
 
 (test-case "vector conversion roundtrip"
   (define v #(10 20 30 40 50))
@@ -123,40 +167,99 @@
   (check-equal? lst lst2))
 
 (test-case "pvector-delete works correctly"
-  (define pv (list->pvector '(0 1 2 3 4)))
+  (define src
+    '(0 1 2 3 4))
+  (define pv
+    (list->pvector src))
   (define-values (pv2 deleted) (pvector-delete pv 2))
   (check-equal? deleted 2)
-  (check-equal? (pvector->list pv2) '(0 1 3 4)))
+  (define pv2-list
+    (pvector->list pv2))
+  (define expected
+    '(0 1 3 4))
+  (check-equal? pv2-list expected))
 
 (test-case "pvector-take and pvector-drop work correctly"
-  (define pv (list->pvector '(0 1 2 3 4 5 6 7 8 9)))
+  (define src
+    '(0 1 2 3 4 5 6 7 8 9))
+  (define pv
+    (list->pvector src))
   (check-equal? (pvector->list (pvector-take pv 5)) '(0 1 2 3 4))
-  (check-equal? (pvector->list (pvector-drop pv 5)) '(5 6 7 8 9)))
+  (define dropped
+    (pvector-drop pv 5))
+  (define dropped-list
+    (pvector->list dropped))
+  (define expected
+    '(5 6 7 8 9))
+  (check-equal? dropped-list expected))
 
 (test-case "in-pvector sequence iteration"
-  (define pv (list->pvector '(1 2 3 4 5)))
-  (define sum (for/fold ([s 0]) ([v (in-pvector pv)]) (+ s v)))
+  (define src
+    '(1 2 3 4 5))
+  (define pv
+    (list->pvector src))
+  (define v-seq
+    (in-pvector pv))
+  (define sum
+    (for/fold ([s 0]) ([v v-seq])
+      (+ s v)
+      ))
   (check-equal? sum 15))
 
 (test-case "large pvector operations"
   (define pv (pvector-empty))
-  (set! pv (for/fold ([pv pv]) ([i (in-range 1000)])
-    (pvector-cons-right pv i)))
+  (define i-seq
+    (in-range 1000))
+  (set! pv
+    (for/fold ([out pv]) ([i i-seq])
+      (pvector-cons-right out i)
+      ))
   (check-equal? (pvector-length pv) 1000)
-  (for ([i (in-range 1000)])
-    (check-equal? (pvector-ref pv i) i)))
+  (define i-seq-2
+    (in-range 1000))
+  (for ([i i-seq-2])
+    (define got
+      (pvector-ref pv i))
+    (check-equal? got i))
+  )
 
 (define (list-set* xs idx value)
-  (append (take xs idx) (list value) (drop xs (add1 idx))))
+  (define prefix
+    (take xs idx))
+  (define next-idx
+    (add1 idx))
+  (define suffix
+    (drop xs next-idx))
+  (append prefix (list value) suffix))
+
+(define (list-insert* xs idx value)
+  (define prefix
+    (take xs idx))
+  (define suffix
+    (drop xs idx))
+  (append prefix (list value) suffix))
+
+(define (list-delete* xs idx)
+  (define prefix
+    (take xs idx))
+  (define next-idx
+    (add1 idx))
+  (define suffix
+    (drop xs next-idx))
+  (append prefix suffix))
 
 (define (apply-list-op xs op)
   (match op
     [(list 'noop) xs]
-    [(list 'cons-right value) (append xs (list value))]
+    [(list 'cons-right value)
+     (define tail
+       (list value))
+     (append xs tail)]
     [(list 'cons-left value) (cons value xs)]
-    [(list 'insert idx value) (append (take xs idx) (list value) (drop xs idx))]
+    [(list 'insert idx value) (list-insert* xs idx value)]
     [(list 'set idx value) (list-set* xs idx value)]
-    [(list 'delete idx) (append (take xs idx) (drop xs (add1 idx)))]))
+    [(list 'delete idx) (list-delete* xs idx)]
+    ))
 
 (define (apply-pvector-op pv op)
   (match op
@@ -173,7 +276,11 @@
 
 (define (generate-seeded-pvector-ops seed steps)
   (random-seed seed)
-  (let loop ([step 0] [xs '()] [ops '()])
+  (define empty-xs
+    '())
+  (define empty-ops
+    '())
+  (let loop ([step 0] [xs empty-xs] [ops empty-ops])
     (cond
       [(= step steps) (reverse ops)]
       [else
@@ -182,17 +289,43 @@
        (define op
          (cond
            [(or (= choice 0) (= choice 1))
-            (list 'cons-right (random 1000))]
+            (define v
+              (random 1000))
+            (list 'cons-right v)]
            [(= choice 2)
-            (list 'cons-left (random 1000))]
+            (define v
+              (random 1000))
+            (list 'cons-left v)]
            [(and (= choice 3) (> len 0))
-            (list 'set (random len) (random 1000))]
+            (define idx
+              (random len))
+            (define v
+              (random 1000))
+            (list 'set idx v)]
            [(and (= choice 4) (> len 0))
-            (list 'delete (random len))]
+            (define idx
+              (random len))
+            (list 'delete idx)]
            [(= choice 5)
-            (list 'insert (if (= len 0) 0 (random (add1 len))) (random 1000))]
-           [else '(noop)]))
-       (loop (add1 step) (apply-list-op xs op) (cons op ops))]
+            (define idx-bound
+              (add1 len))
+            (define idx 0)
+            (when (> len 0)
+              (define rand-idx
+                (random idx-bound))
+              (set! idx rand-idx))
+            (define v
+              (random 1000))
+            (list 'insert idx v)]
+           [else '(noop)]
+           ))
+       (define next-step
+         (add1 step))
+       (define next-xs
+         (apply-list-op xs op))
+       (define next-ops
+         (cons op ops))
+       (loop next-step next-xs next-ops)]
       ) ; cond: step
     ) ; let loop
   ) ; define generate-seeded-pvector-ops
@@ -212,12 +345,22 @@
        (define xs^ (apply-list-op xs op))
        (check-equal? (pvector->list pv^) xs^)
        (check-equal? (pvector-length pv^) (length xs^))
-       (for ([i (in-range (length xs^))])
+       (define n
+         (length xs^))
+       (define check-seq
+         (in-range n))
+       (for ([i check-seq])
+         (define msg
+           (format "step ~a index ~a op ~s" step i op))
          (check-equal?
           (pvector-ref pv^ i)
           (list-ref xs^ i)
-          (format "step ~a index ~a op ~s" step i op)))
-       (loop (cdr remaining) pv^ xs^ (add1 step))]
+          msg))
+       (define next-remaining
+         (cdr remaining))
+       (define next-step
+         (add1 step))
+       (loop next-remaining pv^ xs^ next-step)]
       ) ; cond: remaining
     ) ; let loop
   ) ; test-case seeded mixed operations regression

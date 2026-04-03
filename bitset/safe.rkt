@@ -17,8 +17,12 @@
 (define element/c
   (flat-named-contract 'element exact-nonnegative-integer?))
 
+(define bitset-not-empty/c
+  (not/c bitset-empty?))
 (define nonempty-bitset/c
-  (and/c bitset/c (not/c bitset-empty?)))
+  (and/c bitset/c bitset-not-empty/c))
+(define element-list/c (listof element/c))
+(define element-vector/c (vectorof element/c))
 
 ;; ========================================
 ;; Contract-Protected Exports
@@ -58,8 +62,8 @@
 
   ;; Conversions
   [seq->bitset (-> sequence? bitset/c)]
-  [bitset->list (-> bitset/c (listof element/c))]
-  [bitset->vector (-> bitset/c (vectorof element/c))]
+  [bitset->list (-> bitset/c element-list/c)]
+  [bitset->vector (-> bitset/c element-vector/c)]
   [list->bitset (-> (listof element/c) bitset/c)]
   [vector->bitset (-> (vectorof element/c) bitset/c)]
   [list->bitset* (-> (listof element/c) bitset/c)]

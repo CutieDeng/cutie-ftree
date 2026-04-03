@@ -14,6 +14,13 @@
 (define word-index/c exact-nonnegative-integer?)
 (define line-index/c exact-nonnegative-integer?)
 (define para-index/c exact-nonnegative-integer?)
+;; Shared result contracts to avoid dense closing groups.
+(define span+string/c
+  (values exact-nonnegative-integer?
+          exact-nonnegative-integer?
+          string?))
+(define split-text/c
+  (values text-buffer/c text-buffer/c))
 
 ;; ========================================
 ;; Provide with Contracts
@@ -45,27 +52,21 @@
   ;; Word navigation
   (contract-out
     [text-word-at (-> text-buffer/c word-index/c
-                      (values exact-nonnegative-integer?
-                              exact-nonnegative-integer?
-                              string?))]
+                      span+string/c)]
     [text-char-to-word (-> text-buffer/c char-index/c exact-nonnegative-integer?)]
     ) ; contract-out: word navigation
 
   ;; Line navigation
   (contract-out
     [text-line-at (-> text-buffer/c line-index/c
-                      (values exact-nonnegative-integer?
-                              exact-nonnegative-integer?
-                              string?))]
+                      span+string/c)]
     [text-char-to-line (-> text-buffer/c char-index/c exact-nonnegative-integer?)]
     ) ; contract-out: line navigation
 
   ;; Paragraph navigation
   (contract-out
     [text-para-at (-> text-buffer/c para-index/c
-                      (values exact-nonnegative-integer?
-                              exact-nonnegative-integer?
-                              string?))]
+                      span+string/c)]
     [text-char-to-para (-> text-buffer/c char-index/c exact-nonnegative-integer?)]
     ) ; contract-out: para navigation
 
@@ -80,7 +81,7 @@
   ;; Split/append
   (contract-out
     [text-split-at (-> text-buffer/c char-index/c
-                       (values text-buffer/c text-buffer/c))]
+                       split-text/c)]
     [text-append (-> text-buffer/c text-buffer/c text-buffer/c)]
     ) ; contract-out: split/append
 

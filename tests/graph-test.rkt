@@ -7,13 +7,23 @@
 
 ;; Helper: check if pvector contains a vertex-id with given val
 (define (pvector-has-vertex-val? pv val)
+  (define (same-vertex? v)
+    (define v-val (vertex-id-val v))
+    (= v-val val))
+  (define vs (in-pvector pv))
   (for/or ([v (in-pvector pv)])
-    (= (vertex-id-val v) val)))
+    (same-vertex? v))
+  )
 
 ;; Helper: check if pvector contains an edge-id with given val
 (define (pvector-has-edge-val? pv val)
-  (for/or ([e (in-pvector pv)])
-    (= (edge-id-val e) val)))
+  (define (same-edge? e)
+    (define e-val (edge-id-val e))
+    (= e-val val))
+  (define es (in-pvector pv))
+  (for/or ([e es])
+    (same-edge? e))
+  )
 
 ;; ========================================
 ;; Basic Construction
@@ -39,7 +49,8 @@
   (check-equal? (vertex-id-val v1) 1)
   (check-equal? (graph-vertex-count g2) 2)
   (check-true (graph-vertex? g2 v0))
-  (check-true (graph-vertex? g2 v1)))
+  (define has-v1? (graph-vertex? g2 v1))
+  (check-true has-v1?))
 
 (test-case "graph-remove-vertex"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -51,7 +62,8 @@
   (define g3 (graph-remove-vertex g2 v0))
   (check-equal? (graph-vertex-count g3) 1)
   (check-false (graph-vertex? g3 v0))
-  (check-true (graph-vertex? g3 v1)))
+  (define has-v1? (graph-vertex? g3 v1))
+  (check-true has-v1?))
 
 (test-case "graph-remove-vertex with edges fails"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -59,9 +71,11 @@
   (define-values (g3 e0) (graph-add-edge g2 v0 v1))
 
   ;; Remove v0 should fail (has out-edge)
-  (check-exn exn:fail? (lambda () (graph-remove-vertex g3 v0)))
+  (define (remove-v0) (graph-remove-vertex g3 v0))
+  (check-exn exn:fail? remove-v0)
   ;; Remove v1 should fail (has in-edge)
-  (check-exn exn:fail? (lambda () (graph-remove-vertex g3 v1))))
+  (define (remove-v1) (graph-remove-vertex g3 v1))
+  (check-exn exn:fail? remove-v1))
 
 (test-case "graph-remove-vertex*"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -77,7 +91,8 @@
   (check-equal? (graph-edge-count g4) 0)
   (check-false (graph-vertex? g4 v0))
   (check-true (graph-vertex? g4 v1))
-  (check-false (graph-edge? g4 e0)))
+  (define has-e0? (graph-edge? g4 e0))
+  (check-false has-e0?))
 
 (test-case "vertex-id-no-recycling"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -140,7 +155,8 @@
 
   (define g4 (graph-remove-edge g3 e0))
   (check-equal? (graph-edge-count g4) 0)
-  (check-false (graph-edge? g4 e0)))
+  (define has-e0? (graph-edge? g4 e0))
+  (check-false has-e0?))
 
 (test-case "graph-remove-edge with paired"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -159,7 +175,8 @@
   (define g6 (graph-remove-edge* g5 e2))
   (check-equal? (graph-edge-count g6) 0)
   (check-false (graph-edge? g6 e2))
-  (check-false (graph-edge? g6 e3)))
+  (define has-e3? (graph-edge? g6 e3))
+  (check-false has-e3?))
 
 (test-case "graph-remove-edge-between"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -172,11 +189,13 @@
   (check-false (graph-edge? g4 e0))
 
   ;; Error: no edge
-  (check-exn exn:fail? (lambda () (graph-remove-edge-between g4 v0 v1)))
+  (define (remove-between-empty) (graph-remove-edge-between g4 v0 v1))
+  (check-exn exn:fail? remove-between-empty)
 
   ;; Error: multiple edges
   (define-values (g5 e1) (graph-add-edge g3 v0 v1))
-  (check-exn exn:fail? (lambda () (graph-remove-edge-between g5 v0 v1))))
+  (define (remove-between-multi) (graph-remove-edge-between g5 v0 v1))
+  (check-exn exn:fail? remove-between-multi))
 
 (test-case "graph-remove-edges-between"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -228,9 +247,13 @@
 
   (define edges-between (graph-edges-between g5 v0 v1))
   (check-equal? (pvector-length edges-between) 3)
-  (check-true (pvector-has-edge-val? edges-between (edge-id-val e0)))
-  (check-true (pvector-has-edge-val? edges-between (edge-id-val e1)))
-  (check-true (pvector-has-edge-val? edges-between (edge-id-val e2))))
+  (define e0-val (edge-id-val e0))
+  (define e1-val (edge-id-val e1))
+  (define e2-val (edge-id-val e2))
+  (check-true (pvector-has-edge-val? edges-between e0-val))
+  (check-true (pvector-has-edge-val? edges-between e1-val))
+  (define has-e2? (pvector-has-edge-val? edges-between e2-val))
+  (check-true has-e2?))
 
 ;; ========================================
 ;; Adjacency Queries
@@ -284,7 +307,8 @@
   (define-values (g3 e0) (graph-add-edge g2 v0 v1))
 
   (check-true (graph-has-edge-to? g3 v0 v1))
-  (check-false (graph-has-edge-to? g3 v1 v0)))
+  (define has-back-edge? (graph-has-edge-to? g3 v1 v0))
+  (check-false has-back-edge?))
 
 (test-case "graph-successors"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -295,8 +319,11 @@
 
   (define succs (graph-successors g5 v0))
   (check-equal? (pvector-length succs) 2)
-  (check-true (pvector-has-vertex-val? succs (vertex-id-val v1)))
-  (check-true (pvector-has-vertex-val? succs (vertex-id-val v2))))
+  (define v1-val (vertex-id-val v1))
+  (define v2-val (vertex-id-val v2))
+  (check-true (pvector-has-vertex-val? succs v1-val))
+  (define has-v2? (pvector-has-vertex-val? succs v2-val))
+  (check-true has-v2?))
 
 (test-case "graph-predecessors"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -307,8 +334,11 @@
 
   (define preds (graph-predecessors g5 v2))
   (check-equal? (pvector-length preds) 2)
-  (check-true (pvector-has-vertex-val? preds (vertex-id-val v0)))
-  (check-true (pvector-has-vertex-val? preds (vertex-id-val v1))))
+  (define v0-val (vertex-id-val v0))
+  (define v1-val (vertex-id-val v1))
+  (check-true (pvector-has-vertex-val? preds v0-val))
+  (define has-v1? (pvector-has-vertex-val? preds v1-val))
+  (check-true has-v1?))
 
 ;; ========================================
 ;; Iteration
@@ -323,7 +353,8 @@
   (check-equal? (length verts) 3)
   (check-not-false (member v0 verts))
   (check-not-false (member v1 verts))
-  (check-not-false (member v2 verts)))
+  (define has-v2? (member v2 verts))
+  (check-not-false has-v2?))
 
 (test-case "in-graph-edges"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -334,7 +365,8 @@
   (define edges (for/list ([e (in-graph-edges g4)]) e))
   (check-equal? (length edges) 2)
   (check-not-false (member e0 edges))
-  (check-not-false (member e1 edges)))
+  (define has-e1? (member e1 edges))
+  (check-not-false has-e1?))
 
 (test-case "in-graph-successors"
   (define-values (g1 v0) (graph-add-vertex graph-empty))
@@ -388,6 +420,7 @@
   (check-equal? (graph-edge-count g6) 0)
   (check-true (graph-vertex? g6 v0))
   (check-false (graph-vertex? g6 v1))
-  (check-true (graph-vertex? g6 v2)))
+  (define has-v2? (graph-vertex? g6 v2))
+  (check-true has-v2?))
 
 (displayln "All graph tests passed!")

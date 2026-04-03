@@ -23,10 +23,14 @@
 
 ;; ASCII whitespace: space, tab, newline, return
 (define (ascii-whitespace? c)
-  (or (char=? c #\space)
-      (char=? c #\tab)
-      (char=? c #\newline)
-      (char=? c #\return)))
+  (define is-space? (char=? c #\space))
+  (define is-tab? (char=? c #\tab))
+  (define is-newline? (char=? c #\newline))
+  (define is-return? (char=? c #\return))
+  (or is-space?
+      is-tab?
+      is-newline?
+      is-return?))
 
 ;; ========================================
 ;; Boundary Detection Functions
@@ -36,9 +40,19 @@
 ;; - Non-whitespace character
 ;; - Previous character is whitespace or start of text (prev-char = #f)
 (define (word-start? char prev-char)
+  (define has-prev? (and prev-char #t))
+  (define prev-char-is-whitespace?
+    (if has-prev?
+        (ascii-whitespace? prev-char)
+        #f))
+  (define prev-is-whitespace?
+    prev-char-is-whitespace?)
+  (define char-is-whitespace?
+    (ascii-whitespace? char))
   (and (not (ascii-whitespace? char))
        (or (not prev-char)
-           (ascii-whitespace? prev-char))))
+           prev-is-whitespace?))
+  )
 
 ;; Determine if character ends a line:
 ;; - Is a newline character
@@ -49,7 +63,8 @@
 ;; - Only whitespace since last paragraph start
 ;; prev-blank? indicates if we're currently in a blank region
 (define (in-blank-region? char prev-blank?)
-  (and prev-blank? (ascii-whitespace? char)))
+  (define char-is-whitespace? (ascii-whitespace? char))
+  (and prev-blank? char-is-whitespace?))
 
 ;; Determine if character starts a paragraph:
 ;; - Non-whitespace character
@@ -67,11 +82,14 @@
 ;; prev-char: previous character or #f for start of text
 ;; after-blank-line?: #t if we're after a blank line or at start
 (define (make-text-elem char prev-char after-blank-line?)
+  (define ws? (word-start? char prev-char))
+  (define le? (line-end? char))
+  (define ps? (para-start? char after-blank-line?))
   (text-elem
     char
-    (word-start? char prev-char)
-    (line-end? char)
-    (para-start? char after-blank-line?)))
+    ws?
+    le?
+    ps?))
 
 ;; ========================================
 ;; Measure Function for ft:config
@@ -80,11 +98,13 @@
 ;; Convert a text-elem to its measure contribution
 (define (text-elem->measure elem)
   (match-define (text-elem _ ws? le? ps?) elem)
+  (define para-count
+    (if ps? 1 0))
   (text-measure
     1
     (if ws? 1 0)
     (if le? 1 0)
-    (if ps? 1 0)))
+    para-count))
 
 ;; ========================================
 ;; Exports

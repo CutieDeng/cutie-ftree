@@ -15,4 +15,5 @@
    (list
     'dense-closing-run
     "Line contains a dense closing run (parens/brackets) beyond the configured threshold."
-    'max-run-threshold)))
+    'max-run-threshold)
+   ))

@@ -22,11 +22,14 @@
 
 ;; Combine two measures
 (define (text-measure-append m0 m1)
+  (define paras0 (text-measure-paras m0))
+  (define paras1 (text-measure-paras m1))
+  (define paras-sum (+ paras0 paras1))
   (text-measure
     (+ (text-measure-chars m0) (text-measure-chars m1))
     (+ (text-measure-words m0) (text-measure-words m1))
     (+ (text-measure-lines m0) (text-measure-lines m1))
-    (+ (text-measure-paras m0) (text-measure-paras m1))))
+    paras-sum))
 
 ;; ========================================
 ;; Exports

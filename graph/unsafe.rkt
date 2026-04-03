@@ -306,13 +306,22 @@
   (define src-adj
     (ordered-map-ref adj src-v (ordered-map-empty integer-compare))
     ) ; define src-adj
+  (define (drop-dst-bucket src-adj* dst-v*)
+    (define (delete-two)
+      (ordered-map-delete src-adj* dst-v*))
+    (call-with-values
+      delete-two
+      (lambda (m _)
+        (define out m)
+        out
+        ) ; lambda: pick first value
+      ) ; call-with-values
+    ) ; define drop-dst-bucket
   (define src-dst-edges (ordered-map-ref src-adj dst-v bitset-empty))
   (define new-src-dst-edges (bitset-remove src-dst-edges eid))
   (define new-src-adj
     (if (bitset-empty? new-src-dst-edges)
-        (let-values ([(m _) (ordered-map-delete src-adj dst-v)])
-          m
-          ) ; let-values: delete empty dst bucket
+        (drop-dst-bucket src-adj dst-v)
         (ordered-map-set src-adj dst-v new-src-dst-edges))
     ) ; define new-src-adj
   (define new-adj (ordered-map-set adj src-v new-src-adj))
@@ -365,22 +374,28 @@
 
 ;; Check if there's any edge from src to dst
 (define (graph-has-edge-to?-impl g src-v dst-v)
-  (not (bitset-empty? (graph-edges-between-impl g src-v dst-v)))
+  (define edges-between
+    (graph-edges-between-impl g src-v dst-v))
+  (not (bitset-empty? edges-between))
   ) ; define graph-has-edge-to?-impl
 
 ;; Get successor vertices (bitset of vertex vals)
 (define (graph-successors-impl g vid)
   (define v-adj (ordered-map-ref (graph-adjacency g) vid #f))
   (if v-adj
-      (for/bitset ([kv (in-ordered-map v-adj)])
-        (car kv))
+      (let ()
+        (define kv-seq (in-ordered-map v-adj))
+        (for/bitset ([kv kv-seq])
+          (car kv))
+        )
       bitset-empty)
   ) ; define graph-successors-impl
 
 ;; Get predecessor vertices (bitset of vertex vals)
 (define (graph-predecessors-impl g vid)
   (define in-e (graph-in-edges-impl g vid))
-  (for/bitset ([eid (in-bitset in-e)])
+  (define eid-seq (in-bitset in-e))
+  (for/bitset ([eid eid-seq])
     (graph-edge-src-impl g eid))
   ) ; define graph-predecessors-impl
 

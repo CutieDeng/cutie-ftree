@@ -121,8 +121,10 @@
 
 (test-case "text-ref bounds checking"
   (define tb (string->text "hello"))
-  (check-exn exn:fail? (lambda () (text-ref tb -1)))
-  (check-exn exn:fail? (lambda () (text-ref tb 5))))
+  (define (ref-neg) (text-ref tb -1))
+  (define (ref-oob) (text-ref tb 5))
+  (check-exn exn:fail? ref-neg)
+  (check-exn exn:fail? ref-oob))
 
 ;; ========================================
 ;; Word Navigation Tests
@@ -318,9 +320,10 @@
 
 (test-case "text-append with empty"
   (define tb (string->text "hello"))
-  (define tb2 (text-append tb (text-empty)))
+  (define empty-tb (text-empty))
+  (define tb2 (text-append tb empty-tb))
   (check-equal? (text->string tb2) "hello")
-  (define tb3 (text-append (text-empty) tb))
+  (define tb3 (text-append empty-tb tb))
   (check-equal? (text->string tb3) "hello"))
 
 ;; ========================================
@@ -329,8 +332,9 @@
 
 (test-case "in-text-chars"
   (define tb (string->text "hi"))
+  (define chars '(#\h #\i))
   (check-equal? (for/list ([c (in-text-chars tb)]) c)
-                '(#\h #\i)))
+                chars))
 
 (test-case "in-text-words"
   (define tb (string->text "one two three"))

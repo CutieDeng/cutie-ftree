@@ -19,18 +19,21 @@
   (define id (list-ref spec 0))
   (define description (list-ref spec 1))
   (define kind (list-ref spec 2))
+  (define (pred ctx cfg)
+    (case kind
+      [(max-run-threshold)
+       (define run (line-context-run-length ctx))
+       (define max-run (checker-config-max-run cfg))
+       (>= run max-run)]
+      [else
+       (error 'check-racket-paren-style
+              "unknown rule kind in rules-config: ~a"
+              kind)]
+      ))
   (rule
    id
    description
-   (case kind
-     [(max-run-threshold)
-      (lambda (ctx cfg)
-        (>= (line-context-run-length ctx)
-            (checker-config-max-run cfg)))]
-     [else
-      (error 'check-racket-paren-style
-             "unknown rule kind in rules-config: ~a"
-             kind)])))
+   pred))
 
 (define built-in-rules
   (map spec->rule built-in-rule-specs))
@@ -41,7 +44,8 @@
   (for/list ([r (in-list built-in-rules)]
              #:when (and (or (null? enabled)
                              (member (rule-id r) enabled))
-                         (not (member (rule-id r) disabled))))
+                         (not (member (rule-id r) disabled))
+                         ))
     r))
 
 (define (line->context path line line-number line-kinds)
@@ -55,28 +59,41 @@
   (for/list ([r (in-list rules)]
              #:when ((rule-predicate r) ctx cfg)
              #:unless (exempt? ctx cfg))
-    (violation (line-context-path ctx)
-               (line-context-line-number ctx)
-               (line-context-run-length ctx)
-               (line-context-raw-line ctx)
-               (rule-id r))))
+    (define rule-id^ (rule-id r))
+    (define v
+      (violation (line-context-path ctx)
+                 (line-context-line-number ctx)
+                 (line-context-run-length ctx)
+                 (line-context-raw-line ctx)
+                 rule-id^))
+    v)
+  )
 
 (define (scan-file path cfg)
   (define rules (active-rules cfg))
   (define lines (file->lines path))
   (define line-kinds (build-ast-line-kinds path))
-  (append*
-   (for/list ([line (in-list lines)]
-              [line-number (in-naturals 1)])
-     (line-violations (line->context path line line-number line-kinds) cfg rules))))
+  (define line-num-seq (in-naturals 1))
+  (define violations-by-line
+    (for/list ([line (in-list lines)]
+               [line-number line-num-seq])
+      (define ctx
+        (line->context path line line-number line-kinds))
+      (line-violations ctx cfg rules)
+      ))
+  (append* violations-by-line))
 
 (define (scan-files paths cfg)
-  (append* (for/list ([p (in-list paths)])
-             (scan-file p cfg))))
+  (define chunks
+    (for/list ([p (in-list paths)])
+      (scan-file p cfg)
+      ))
+  (append* chunks))
 
 (define (violation->key v)
+  (define v-rule-id (violation-rule-id v))
   (format "~a\t~a\t~a\t~a"
           (path->string (violation-path v))
           (violation-line-number v)
           (violation-run-length v)
-          (violation-rule-id v)))
+          v-rule-id))

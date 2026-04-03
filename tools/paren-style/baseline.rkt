@@ -15,11 +15,14 @@
   (define lines
     (if (file-exists? path)
         (file->lines path)
-        '()))
-  (for/fold ([acc (set)])
+        '()
+        ))
+  (define acc0 (set))
+  (for/fold ([acc acc0])
             ([line (in-list lines)]
              #:unless (blank-string? line))
-    (set-add acc line)))
+    (set-add acc line)
+    ))
 
 (define (write-baseline! path violations)
   (define keys
@@ -28,10 +31,14 @@
   (call-with-output-file path
     (lambda (out)
       (for ([key (in-list keys)])
-        (fprintf out "~a\n" key)))
+        (fprintf out "~a\n" key)
+        ))
     #:exists 'truncate/replace))
 
 (define (apply-baseline violations baseline-set)
+  (define (in-baseline? v)
+    (define key (violation->key v))
+    (set-member? baseline-set key))
   (for/list ([v (in-list violations)]
-             #:unless (set-member? baseline-set (violation->key v)))
+             #:unless (in-baseline? v))
     v))

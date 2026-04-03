@@ -33,81 +33,137 @@
 ;; PVector Benchmark
 ;; ========================================
 
+(define (sum-pvector-gen pv)
+  (define seq (in-pvector pv))
+  (for/fold ([sum 0]) ([v seq])
+    (+ sum v)
+    ))
+
+(define (sum-pvector-index pv)
+  (define seq (in-pvector/index pv))
+  (for/fold ([sum 0]) ([v seq])
+    (+ sum v)
+    ))
+
+(define (sum-pvector-rev pv)
+  (define seq (in-pvector-reverse pv))
+  (for/fold ([sum 0]) ([v seq])
+    (+ sum v)
+    ))
+
 (define (benchmark-pvector size iterations)
   (printf "\n=== PVector Benchmark (size: ~a, iterations: ~a) ===\n" size iterations)
 
   ;; Create test pvector
-  (define pv (vector->pvector (build-vector size values)))
+  (define vec (build-vector size values))
+  (define pv (vector->pvector vec))
 
   ;; Benchmark: sum all elements using generator
   (time-it "in-pvector (generator)"
     (lambda ()
-      (for/fold ([sum 0]) ([v (in-pvector pv)])
-        (+ sum v)))
+      (sum-pvector-gen pv))
     iterations)
 
   ;; Benchmark: sum all elements using index-based
   (time-it "in-pvector/index (index-based)"
     (lambda ()
-      (for/fold ([sum 0]) ([v (in-pvector/index pv)])
-        (+ sum v)))
+      (sum-pvector-index pv))
     iterations)
 
   ;; Benchmark: reverse traversal
   (time-it "in-pvector-reverse (generator)"
     (lambda ()
-      (for/fold ([sum 0]) ([v (in-pvector-reverse pv)])
-        (+ sum v)))
+      (sum-pvector-rev pv))
     iterations)
 
   ;; Verify correctness
-  (define sum-gen (for/fold ([sum 0]) ([v (in-pvector pv)]) (+ sum v)))
-  (define sum-idx (for/fold ([sum 0]) ([v (in-pvector/index pv)]) (+ sum v)))
-  (define sum-rev (for/fold ([sum 0]) ([v (in-pvector-reverse pv)]) (+ sum v)))
+  (define sum-gen (sum-pvector-gen pv))
+  (define sum-idx (sum-pvector-index pv))
+  (define sum-rev (sum-pvector-rev pv))
   (define expected (/ (* (sub1 size) size) 2))
-  (unless (and (= sum-gen expected) (= sum-idx expected) (= sum-rev expected))
-    (error 'benchmark "Correctness check failed!")))
+  (define bad-msg "Correctness check failed!")
+  (define (fail!)
+    (error 'benchmark bad-msg))
+  (define ok-gen? (= sum-gen expected))
+  (define ok-idx? (= sum-idx expected))
+  (define ok-rev? (= sum-rev expected))
+  (define all-ok?
+    (and ok-gen? ok-idx? ok-rev?))
+  (define bad?
+    (not all-ok?))
+  (when bad?
+    (fail!))
+  )
 
 ;; ========================================
 ;; Ordered-Map Benchmark
 ;; ========================================
 
+(define (sum-ordered-map-gen om)
+  (define seq (in-ordered-map om))
+  (for/fold ([sum 0]) ([kv seq])
+    (+ sum (car kv))
+    ))
+
+(define (sum-ordered-map-lazy om)
+  (define seq (in-ordered-map/lazy om))
+  (for/fold ([sum 0]) ([kv seq])
+    (+ sum (car kv))
+    ))
+
+(define (sum-ordered-map-rev om)
+  (define seq (in-ordered-map-reverse om))
+  (for/fold ([sum 0]) ([kv seq])
+    (+ sum (car kv))
+    ))
+
 (define (benchmark-ordered-map size iterations)
   (printf "\n=== Ordered-Map Benchmark (size: ~a, iterations: ~a) ===\n" size iterations)
 
   ;; Create test ordered-map
+  (define i-seq (in-range size))
+  (define m0 (ordered-map-empty integer-compare))
   (define om
-    (for/fold ([m (ordered-map-empty integer-compare)]) ([i (in-range size)])
-      (ordered-map-insert m i i #t)))
+    (for/fold ([m m0]) ([i i-seq])
+      (ordered-map-insert m i i #t)
+      ))
 
   ;; Benchmark: sum all keys using generator
   (time-it "in-ordered-map (generator)"
     (lambda ()
-      (for/fold ([sum 0]) ([kv (in-ordered-map om)])
-        (+ sum (car kv))))
+      (sum-ordered-map-gen om))
     iterations)
 
   ;; Benchmark: sum all keys using lazy query-based
   (time-it "in-ordered-map/lazy (query-based)"
     (lambda ()
-      (for/fold ([sum 0]) ([kv (in-ordered-map/lazy om)])
-        (+ sum (car kv))))
+      (sum-ordered-map-lazy om))
     iterations)
 
   ;; Benchmark: reverse traversal
   (time-it "in-ordered-map-reverse (generator)"
     (lambda ()
-      (for/fold ([sum 0]) ([kv (in-ordered-map-reverse om)])
-        (+ sum (car kv))))
+      (sum-ordered-map-rev om))
     iterations)
 
   ;; Verify correctness
-  (define sum-gen (for/fold ([sum 0]) ([kv (in-ordered-map om)]) (+ sum (car kv))))
-  (define sum-lazy (for/fold ([sum 0]) ([kv (in-ordered-map/lazy om)]) (+ sum (car kv))))
-  (define sum-rev (for/fold ([sum 0]) ([kv (in-ordered-map-reverse om)]) (+ sum (car kv))))
+  (define sum-gen (sum-ordered-map-gen om))
+  (define sum-lazy (sum-ordered-map-lazy om))
+  (define sum-rev (sum-ordered-map-rev om))
   (define expected (/ (* (sub1 size) size) 2))
-  (unless (and (= sum-gen expected) (= sum-lazy expected) (= sum-rev expected))
-    (error 'benchmark "Correctness check failed!")))
+  (define bad-msg "Correctness check failed!")
+  (define (fail!)
+    (error 'benchmark bad-msg))
+  (define ok-gen? (= sum-gen expected))
+  (define ok-lazy? (= sum-lazy expected))
+  (define ok-rev? (= sum-rev expected))
+  (define all-ok?
+    (and ok-gen? ok-lazy? ok-rev?))
+  (define bad?
+    (not all-ok?))
+  (when bad?
+    (fail!))
+  )
 
 ;; ========================================
 ;; Run Benchmarks

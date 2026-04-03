@@ -17,9 +17,10 @@
 
 (test-case "build from list - sum"
   (define ss (list->segment-seq '(1 2 3 4 5) 0 +))
+  (define expected '(1 2 3 4 5))
   (check-equal? (segment-seq-length ss) 5)
   (check-equal? (segment-seq-aggregate ss) 15)
-  (check-equal? (segment-seq->list ss) '(1 2 3 4 5)))
+  (check-equal? (segment-seq->list ss) expected))
 
 (test-case "random access"
   (define ss (list->segment-seq '(10 20 30 40 50) 0 +))
@@ -60,7 +61,8 @@
   (check-equal? (segment-seq->list ss2) '(1 2 3 100))
   ;; Insert in middle
   (define ss3 (segment-seq-insert ss 1 100))
-  (check-equal? (segment-seq->list ss3) '(1 100 2 3)))
+  (define expected '(1 100 2 3))
+  (check-equal? (segment-seq->list ss3) expected))
 
 (test-case "delete"
   (define ss (list->segment-seq '(1 2 3 4 5) 0 +))
@@ -81,7 +83,8 @@
 
   (define-values (ss5 v2) (segment-seq-pop-front ss4))
   (check-equal? v2 0)
-  (check-equal? (segment-seq->list ss5) '(1)))
+  (define expected '(1))
+  (check-equal? (segment-seq->list ss5) expected))
 
 (test-case "split and concat"
   (define ss (list->segment-seq '(1 2 3 4 5) 0 +))
@@ -93,7 +96,8 @@
 
   ;; Concat back
   (define ss2 (segment-seq-concat left right))
-  (check-equal? (segment-seq->list ss2) '(1 2 3 4 5)))
+  (define expected '(1 2 3 4 5))
+  (check-equal? (segment-seq->list ss2) expected))
 
 ;; ========================================
 ;; Min Segment Tree Tests
@@ -160,6 +164,7 @@
   ;; ss1 unchanged
   (check-equal? (segment-seq->list ss1) '(1 2 3))
   (check-equal? (segment-seq->list ss2) '(1 100 3))
-  (check-equal? (segment-seq->list ss3) '(999 1 2 3)))
+  (define expected '(999 1 2 3))
+  (check-equal? (segment-seq->list ss3) expected))
 
 (printf "All segment-seq tests passed!\n")

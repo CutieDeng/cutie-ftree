@@ -29,19 +29,34 @@
   (printf "  ~a: ~a ms (total: ~a ms, ~a iterations)\n"
     name (real->decimal-string per-iter 3) (real->decimal-string time 1) iterations))
 
+(define (make-pvector-range size)
+  (define idx-seq
+    (in-range size))
+  (define elems
+    (for/list ([i idx-seq])
+      i))
+  (list->pvector elems))
+
 (define (run-ref-benchmark pv size iterations label)
   (printf "\n=== pvector-ref Benchmark (~a, size: ~a, iterations: ~a) ===\n" label size iterations)
 
   ;; Generate random indices to access
-  (define indices (for/list ([_ (in-range iterations)])
-    (random size)))
+  (define iter-seq
+    (in-range iterations))
+  (define indices
+    (for/list ([_ iter-seq])
+      (define idx
+        (random size))
+      idx
+      ))
 
   ;; Legacy: uses digit-add-list
   (define time-legacy
     (measure-time
       (lambda ()
         (for ([idx indices])
-          (pvector-ref/list pv idx)))
+          (void (pvector-ref/list pv idx))
+          ))
       1))
   (format-result "pvector-ref/list (legacy)" time-legacy 1)
 
@@ -50,25 +65,37 @@
     (measure-time
       (lambda ()
         (for ([idx indices])
-          (pvector-ref pv idx)))
+          (void (pvector-ref pv idx))
+          ))
       1))
   (format-result "pvector-ref (default)" time-default 1)
 
-  (printf "  Speedup: ~ax\n" (real->decimal-string (/ time-legacy time-default) 2)))
+  (define speedup
+    (real->decimal-string (/ time-legacy time-default) 2))
+  (printf "  Speedup: ~ax\n" speedup))
 
 (define (run-set-benchmark pv size iterations label)
   (printf "\n=== pvector-set Benchmark (~a, size: ~a, iterations: ~a) ===\n" label size iterations)
 
   ;; Generate random indices and values
-  (define indices (for/list ([_ (in-range iterations)])
-    (random size)))
+  (define iter-seq
+    (in-range iterations))
+  (define indices
+    (for/list ([_ iter-seq])
+      (define idx
+        (random size))
+      idx
+      ))
 
   ;; Legacy: uses digit-add-list + list->digit
   (define time-legacy
     (measure-time
       (lambda ()
         (for/fold ([p pv]) ([idx indices])
-          (pvector-set/list p idx 'new-value)))
+          (define next-p
+            (pvector-set/list p idx 'new-value))
+          next-p
+          ))
       1))
   (format-result "pvector-set/list (legacy)" time-legacy 1)
 
@@ -77,17 +104,28 @@
     (measure-time
       (lambda ()
         (for/fold ([p pv]) ([idx indices])
-          (pvector-set p idx 'new-value)))
+          (define next-p
+            (pvector-set p idx 'new-value))
+          next-p
+          ))
       1))
   (format-result "pvector-set (default)" time-default 1)
 
-  (printf "  Speedup: ~ax\n" (real->decimal-string (/ time-legacy time-default) 2)))
+  (define speedup
+    (real->decimal-string (/ time-legacy time-default) 2))
+  (printf "  Speedup: ~ax\n" speedup))
 
 (define (run-mixed-benchmark pv size iterations label)
   (printf "\n=== Mixed ref+set Benchmark (~a, size: ~a, iterations: ~a) ===\n" label size iterations)
 
-  (define indices (for/list ([_ (in-range iterations)])
-    (random size)))
+  (define iter-seq
+    (in-range iterations))
+  (define indices
+    (for/list ([_ iter-seq])
+      (define idx
+        (random size))
+      idx
+      ))
 
   ;; Legacy
   (define time-legacy
@@ -95,7 +133,12 @@
       (lambda ()
         (for/fold ([p pv]) ([idx indices])
           (define v (pvector-ref/list p idx))
-          (pvector-set/list p idx (add1 v))))
+          (define next-v
+            (add1 v))
+          (define next-p
+            (pvector-set/list p idx next-v))
+          next-p
+          ))
       1))
   (format-result "ref+set/list (legacy)" time-legacy 1)
 
@@ -105,11 +148,18 @@
       (lambda ()
         (for/fold ([p pv]) ([idx indices])
           (define v (pvector-ref p idx))
-          (pvector-set p idx (add1 v))))
+          (define next-v
+            (add1 v))
+          (define next-p
+            (pvector-set p idx next-v))
+          next-p
+          ))
       1))
   (format-result "ref+set (default)" time-default 1)
 
-  (printf "  Speedup: ~ax\n" (real->decimal-string (/ time-legacy time-default) 2)))
+  (define speedup
+    (real->decimal-string (/ time-legacy time-default) 2))
+  (printf "  Speedup: ~ax\n" speedup))
 
 ;; ========================================
 ;; Correctness tests first
@@ -117,13 +167,16 @@
 
 (displayln "Verifying correctness: legacy vs default implementations...")
 
-(define test-pv (list->pvector (for/list ([i 1000]) i)))
+(define test-pv
+  (make-pvector-range 1000))
 
 ;; Test ref correctness
 (for ([i (in-range 100)])
   (define idx (random 1000))
+  (define msg
+    (format "ref mismatch at index ~a" idx))
   (check-equal? (pvector-ref test-pv idx) (pvector-ref/list test-pv idx)
-    (format "ref mismatch at index ~a" idx)))
+    msg))
 
 ;; Test set correctness
 (for ([i (in-range 100)])
@@ -135,7 +188,11 @@
   (check-equal? (pvector-ref pv2 idx) new-val)
   ;; Check other elements unchanged
   (define other-idx (modulo (+ idx 1) 1000))
-  (check-equal? (pvector-ref pv1 other-idx) (pvector-ref pv2 other-idx)))
+  (define v1
+    (pvector-ref pv1 other-idx))
+  (define v2
+    (pvector-ref pv2 other-idx))
+  (check-equal? v1 v2))
 
 (displayln "Correctness verified!\n")
 
@@ -144,7 +201,8 @@
 ;; ========================================
 
 (displayln "Warming up JIT...")
-(define warmup-pv (list->pvector (for/list ([i 100]) i)))
+(define warmup-pv
+  (make-pvector-range 100))
 (for ([_ (in-range 1000)])
   (pvector-ref warmup-pv (random 100))
   (pvector-ref/list warmup-pv (random 100))
@@ -159,29 +217,24 @@
 (displayln "         BENCHMARK RESULTS")
 (displayln "========================================")
 
+(define (run-size-benchmarks size ref-iters set-iters label)
+  (define pv
+    (make-pvector-range size))
+  (run-ref-benchmark pv size ref-iters label)
+  (run-set-benchmark pv size set-iters label)
+  (run-mixed-benchmark pv size set-iters label))
+
 ;; Small size: 100 elements
-(let ([pv (list->pvector (for/list ([i 100]) i))])
-  (run-ref-benchmark pv 100 10000 "small")
-  (run-set-benchmark pv 100 1000 "small")
-  (run-mixed-benchmark pv 100 1000 "small"))
+(run-size-benchmarks 100 10000 1000 "small")
 
 ;; Medium size: 1000 elements
-(let ([pv (list->pvector (for/list ([i 1000]) i))])
-  (run-ref-benchmark pv 1000 10000 "medium")
-  (run-set-benchmark pv 1000 1000 "medium")
-  (run-mixed-benchmark pv 1000 1000 "medium"))
+(run-size-benchmarks 1000 10000 1000 "medium")
 
 ;; Large size: 10000 elements
-(let ([pv (list->pvector (for/list ([i 10000]) i))])
-  (run-ref-benchmark pv 10000 10000 "large")
-  (run-set-benchmark pv 10000 1000 "large")
-  (run-mixed-benchmark pv 10000 1000 "large"))
+(run-size-benchmarks 10000 10000 1000 "large")
 
 ;; Very large size: 100000 elements
-(let ([pv (list->pvector (for/list ([i 100000]) i))])
-  (run-ref-benchmark pv 100000 5000 "very large")
-  (run-set-benchmark pv 100000 500 "very large")
-  (run-mixed-benchmark pv 100000 500 "very large"))
+(run-size-benchmarks 100000 5000 500 "very large")
 
 (displayln "\n========================================")
 (displayln "         BENCHMARK COMPLETE")

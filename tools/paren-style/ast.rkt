@@ -40,43 +40,56 @@
 
 (define (classify-for-clause clause-stx)
   (define d (syntax->datum clause-stx))
+  (define d-list? (list? d))
+  (define d-len (if d-list? (length d) 0))
+  (define d2
+    (if (>= d-len 2)
+        (second d)
+        #f))
+  (define d2-len (if (list? d2) (length d2) 0))
+  (define d2-1
+    (if (>= d2-len 1) (first d2) #f))
+  (define d2-2
+    (if (>= d2-len 2) (second d2) #f))
+  (define d2-3
+    (if (>= d2-len 3) (third d2) #f))
   (cond
     [(and (list? d)
           (= (length d) 2)
           (symbol? (first d))
           (equal? (first d) '_)
-          (list? (second d))
-          (= (length (second d)) 1)
-          (equal? (first (second d)) '_))
+          (list? d2)
+          (= d2-len 1)
+          (equal? d2-1 '_))
      'for-clause-placeholder]
     [(and (list? d)
           (= (length d) 2)
           (symbol? (first d))
-          (list? (second d))
-          (>= (length (second d)) 2)
+          (list? d2)
+          (>= d2-len 2)
           (in-seq-symbol?
-           (first (second d)))
+           d2-1)
           (= (sub1
-              (length (second d)))
+              d2-len)
              1)
           (non-compound-atom?
-           (second (second d)))
+           d2-2)
           )
      'for-clause-single-seq]
     [(and (list? d)
           (= (length d) 2)
           (symbol? (first d))
-          (list? (second d))
-          (>= (length (second d)) 3)
+          (list? d2)
+          (>= d2-len 3)
           (in-seq-symbol?
-           (first (second d)))
+           d2-1)
           (= (sub1
-              (length (second d)))
+              d2-len)
              2)
           (non-compound-atom?
-           (second (second d)))
+           d2-2)
           (non-compound-atom?
-           (third (second d)))
+           d2-3)
           )
      'for-clause-two-atom-seq]
     [else
@@ -154,8 +167,10 @@
   ) ; define walk-ast
 
 (define (file-starts-with-lang? path)
+  (define (fail->false _e)
+    #f)
   (with-handlers ([exn:fail?
-                   (lambda (_e) #f)])
+                   fail->false])
     (call-with-input-file path
       (lambda (in)
         (define first-line (read-line in 'any))
@@ -184,23 +199,27 @@
 
 (define (build-ast-line-kinds path)
   (define tbl (make-hash))
+  (define (read-fallback _e2)
+    tbl)
+  (define (handle-read-fail _e)
+    ;; Best-effort fallback: accept reader forms.
+    (with-handlers ([exn:fail:read? read-fallback])
+      (parameterize ([read-accept-reader #t])
+        (walk-file-forms! path tbl #:skip-lang? #f))
+      ) ; parameterize fallback reader
+    ) ; with-handlers fallback
   (with-handlers ([exn:fail:read?
-                   (lambda (_e)
-                     ;; Best-effort fallback: accept reader forms.
-                     (with-handlers ([exn:fail:read?
-                                      (lambda (_e2) tbl)])
-                       (parameterize ([read-accept-reader #t])
-                         (walk-file-forms! path tbl #:skip-lang? #f))
-                       ) ; parameterize fallback reader
-                     ) ; with-handlers fallback
-                   ])
+                   handle-read-fail])
+    (define skip-lang?
+      (file-starts-with-lang? path))
     (walk-file-forms! path tbl
-                      #:skip-lang? (file-starts-with-lang? path)))
+                      #:skip-lang? skip-lang?))
   tbl)
 
 (define (semantic-kind-for-line line-kinds line-number)
+  (define no-kinds (set))
   (define kinds
-    (hash-ref line-kinds line-number (set)))
+    (hash-ref line-kinds line-number no-kinds))
   (cond
     [(set-member? kinds 'for-header) 'for-header]
     [(set-member? kinds 'for-clause) 'for-clause]
