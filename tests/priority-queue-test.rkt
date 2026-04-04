@@ -100,7 +100,11 @@
 
 (test-case "large queue"
   (define n 100)
-  (define lst (for/list ([i (in-range n)]) (cons (random 1000) i)))
+  (define lst
+    (for/list ([i (in-range n)])
+      (cons (random 1000)
+            i))
+    ) ; define lst
   (define pq (list->priority-queue integer-compare lst))
 
   (check-equal? (priority-queue-count pq) n)

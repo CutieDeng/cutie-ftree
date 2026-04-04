@@ -2193,7 +2193,10 @@
     (syntax-case stx ()
       [(_ pairs-pat)
        #'(? ordered-map?
-            (app (lambda (om) (for/list ([kv (in-ordered-map om)]) kv))
+            (app (lambda (om)
+                   (for/list ([kv (in-ordered-map om)])
+                     kv)
+                   ) ; lambda: om -> kv list
                  pairs-pat)
             )]
       ) ; syntax-case

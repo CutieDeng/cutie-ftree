@@ -333,12 +333,15 @@
 (test-case "in-text-chars"
   (define tb (string->text "hi"))
   (define chars '(#\h #\i))
-  (check-equal? (for/list ([c (in-text-chars tb)]) c)
+  (check-equal? (for/list ([c (in-text-chars tb)])
+                  c)
                 chars))
 
 (test-case "in-text-words"
   (define tb (string->text "one two three"))
-  (define words (for/list ([w (in-text-words tb)]) w))
+  (define words
+    (for/list ([w (in-text-words tb)])
+      w))
   (check-equal? (length words) 3)
   (check-equal? (third (first words)) "one")
   (check-equal? (third (second words)) "two")
@@ -346,7 +349,9 @@
 
 (test-case "in-text-lines"
   (define tb (string->text "line1\nline2"))
-  (define lines (for/list ([l (in-text-lines tb)]) l))
+  (define lines
+    (for/list ([l (in-text-lines tb)])
+      l))
   (check-equal? (length lines) 2)
   (check-equal? (third (first lines)) "line1")
   (check-equal? (third (second lines)) "line2"))

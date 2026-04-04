@@ -29,6 +29,9 @@
    raw-line
    code-prefix
    run-length
+   run-start-column
+   run-end-column
+   run-at-line-end?
    semantic-kind
    semantic-tags)
   #:transparent)

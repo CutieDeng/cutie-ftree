@@ -989,7 +989,8 @@
   ) ; define list->pvector
 
 (define (pvector->list pv)
-  (for/list ([v (in-pvector pv)]) v)
+  (for/list ([v (in-pvector pv)])
+    v)
   ) ; define pvector->list
 
 ;; ========================================

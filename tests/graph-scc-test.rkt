@@ -63,7 +63,10 @@
 ;; Convert pvector[bitset] to list[list[int]] for easier comparison
 (define (sccs->lists sccs)
   (for/list ([scc (in-pvector sccs)])
-    (sort (for/list ([v (in-bitset scc)]) v) <)))
+    (sort (for/list ([v (in-bitset scc)])
+            v)
+          <))
+  ) ; define sccs->lists
 
 ;; ========================================
 ;; Basic SCC Tests

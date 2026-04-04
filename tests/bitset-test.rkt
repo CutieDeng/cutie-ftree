@@ -161,17 +161,25 @@
 
 (test-case "in-bitset"
   (define s (bitset 0 2 5 7))
-  (define elems (for/list ([i (in-bitset s)]) i))
+  (define elems
+    (for/list ([i (in-bitset s)])
+      i))
   (check-equal? elems '(0 2 5 7))
-  (define empty-elems (for/list ([i (in-bitset 0)]) i))
+  (define empty-elems
+    (for/list ([i (in-bitset 0)])
+      i))
   (define empty-list '())
   (check-equal? empty-elems empty-list))
 
 (test-case "in-bitset/reverse"
   (define s (bitset 0 2 5 7))
-  (define elems (for/list ([i (in-bitset/reverse s)]) i))
+  (define elems
+    (for/list ([i (in-bitset/reverse s)])
+      i))
   (check-equal? elems '(7 5 2 0))
-  (define empty-elems (for/list ([i (in-bitset/reverse 0)]) i))
+  (define empty-elems
+    (for/list ([i (in-bitset/reverse 0)])
+      i))
   (define empty-list '())
   (check-equal? empty-elems empty-list))
 

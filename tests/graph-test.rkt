@@ -349,7 +349,9 @@
   (define-values (g2 v1) (graph-add-vertex g1))
   (define-values (g3 v2) (graph-add-vertex g2))
 
-  (define verts (for/list ([v (in-graph-vertices g3)]) v))
+  (define verts
+    (for/list ([v (in-graph-vertices g3)])
+      v))
   (check-equal? (length verts) 3)
   (check-not-false (member v0 verts))
   (check-not-false (member v1 verts))
@@ -362,7 +364,9 @@
   (define-values (g3 e0) (graph-add-edge g2 v0 v1))
   (define-values (g4 e1) (graph-add-edge g3 v1 v0))
 
-  (define edges (for/list ([e (in-graph-edges g4)]) e))
+  (define edges
+    (for/list ([e (in-graph-edges g4)])
+      e))
   (check-equal? (length edges) 2)
   (check-not-false (member e0 edges))
   (define has-e1? (member e1 edges))
@@ -375,7 +379,9 @@
   (define-values (g4 e0) (graph-add-edge g3 v0 v1))
   (define-values (g5 e1) (graph-add-edge g4 v0 v2))
 
-  (define succs (for/list ([v (in-graph-successors g5 v0)]) v))
+  (define succs
+    (for/list ([v (in-graph-successors g5 v0)])
+      v))
   (check-equal? (length succs) 2))
 
 ;; ========================================

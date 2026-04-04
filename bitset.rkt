@@ -186,7 +186,9 @@
   ) ; define seq->bitset
 
 (define (bitset->list s)
-  (for/list ([i (in-bitset s)]) i))
+  (for/list ([i (in-bitset s)])
+    i)
+  ) ; define bitset->list
 
 (define (bitset->vector s)
   (list->vector (bitset->list s))

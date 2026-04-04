@@ -143,7 +143,9 @@
 
 (test-case "large sequence"
   (define n 1000)
-  (define lst (for/list ([i (in-range n)]) i))
+  (define lst
+    (for/list ([i (in-range n)])
+      i))
   (define ss (list->segment-seq lst 0 +))
 
   (check-equal? (segment-seq-length ss) n)
@@ -153,7 +155,9 @@
   (check-equal? (segment-seq-ref ss 500) 500)
 
   ;; Range query: sum of [100, 200)
-  (define expected (for/sum ([i (in-range 100 200)]) i))
+  (define expected
+    (for/sum ([i (in-range 100 200)])
+      i))
   (check-equal? (segment-seq-range-query ss 100 200) expected))
 
 (test-case "immutability"

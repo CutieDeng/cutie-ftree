@@ -106,6 +106,42 @@
        )
   ) ; define head-symbol
 
+(define (mark-call-tag! stx tbl sym tag)
+  (define head (head-symbol stx))
+  (when (eq? head sym)
+    (define line (syntax-line stx))
+    (mark-kind! tbl line tag))
+  ) ; define mark-call-tag!
+
+(define (mark-thunk-lambda-tag! stx tbl)
+  (define head (head-symbol stx))
+  (when (eq? head 'lambda)
+    (define parts (syntax->list stx))
+    (when (and parts
+               (>= (length parts) 3))
+      (define args-stx
+        (second parts))
+      (define args-list
+        (syntax->list args-stx))
+      (define first-body
+        (third parts))
+      (define body-head
+        (head-symbol first-body))
+      (define thunk-arg-list?
+        (and args-list
+             (null? args-list))
+        ) ; define thunk-arg-list?
+      (define body-is-call?
+        (symbol? body-head))
+      (when (and thunk-arg-list?
+                 body-is-call?)
+        (define line (syntax-line stx))
+        (mark-kind! tbl line 'thunk-lambda)
+        ) ; when: thunk lambda with call body
+      ) ; when: lambda has args+body parts
+    ) ; when: lambda head
+  ) ; define mark-thunk-lambda-tag!
+
 (define (mark-for-clauses! stx tbl)
   (define lst (syntax->list stx))
   (when (and lst (>= (length lst) 2))
@@ -149,6 +185,13 @@
         [(eq? sym '->i)
          (mark-kind! tbl line 'contract-header)]
         )) ; cond: semantic heads
+    (mark-call-tag! stx tbl 'mk-pv 'mk-pv-call)
+    (mark-call-tag! stx tbl 'mk-om 'mk-om-call)
+    (mark-call-tag! stx tbl 'mk-om/kv 'mk-om/kv-call)
+    (mark-call-tag! stx tbl 'check-exn 'check-exn-call)
+    (mark-call-tag! stx tbl 'check-not-exn 'check-not-exn-call)
+    (mark-call-tag! stx tbl 'regexp-match? 'regexp-match-call)
+    (mark-thunk-lambda-tag! stx tbl)
     (define lst (syntax->list stx))
     (cond
       [lst
